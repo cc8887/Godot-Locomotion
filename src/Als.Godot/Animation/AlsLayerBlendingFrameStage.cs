@@ -10,6 +10,8 @@ namespace GodotAls.Animation;
 internal sealed class AlsLayerBlendingFrameStage : IAlsLayerBlendingSink
 {
     private readonly AlsLayerBlendingRuntime _layer;
+    private readonly AlsRefactoredLayeringFrameStage? _refactored;
+    internal long RefactoredFrames => _refactored?.CommittedFrames ?? 0;
     private readonly AlsBasePosesRuntime _bases;
     private readonly AlsBasePosesSourceSampler _sampler;
     private readonly AlsLocalPose[] _base, _overlay, _pose;
@@ -29,10 +31,10 @@ internal sealed class AlsLayerBlendingFrameStage : IAlsLayerBlendingSink
     public AlsBasePosesState BasePosesState => _bases.State;
     public AlsBasePosesState CommittedBasePosesState => _bases.CommittedState;
     public ReadOnlySpan<int> InputUpdateOrder => _order.AsSpan(0,_count);
-    public AlsPoseUpdateContext BaseContext => Context(0);
-    public AlsPoseUpdateContext OverlayContext => Context(1);
-    public ReadOnlySpan<AlsLocalPose> Pose => _evaluated ? _pose : throw new InvalidOperationException("Post Layering has not evaluated.");
-    public ReadOnlySpan<AlsInertialCurve> Curves => _evaluated ? _curves : throw new InvalidOperationException("Post Layering has not evaluated.");
+    public AlsPoseUpdateContext BaseContext => _refactored?.BaseContext ?? Context(0);
+    public AlsPoseUpdateContext OverlayContext => _refactored?.OverlayContext ?? Context(1);
+    public ReadOnlySpan<AlsLocalPose> Pose => _refactored is not null ? _refactored.Pose : _evaluated ? _pose : throw new InvalidOperationException("Post Layering has not evaluated.");
+    public ReadOnlySpan<AlsInertialCurve> Curves => _refactored is not null ? _refactored.Curves : _evaluated ? _curves : throw new InvalidOperationException("Post Layering has not evaluated.");
 
     public AlsLayerBlendingFrameStage(AlsMovementGraphDefinition definition, AlsAnimationSetDefinition set,
         AlsAnimationLibraryBuildResult library, ReadOnlySpan<string> names, ReadOnlySpan<string> baseNames)
@@ -40,6 +42,8 @@ internal sealed class AlsLayerBlendingFrameStage : IAlsLayerBlendingSink
         _sampler = new(definition.BasePoses,set,library,names,definition.BasePoseRetarget,definition.BasePoseSourceKeys);
         var layout = _sampler.Layout;
         _layer = new(definition.LayerBlending,layout.Names,layout.Parents,names,layout.ReferencePose);
+        if(AlsAnimationRuntimeOptions.Has("--refactored-layering-frame"))
+            _refactored=new(set.Skeletons[definition.AimSampling.SkeletonId],names,baseNames);
         _bases = new(definition.BasePoses,layout.ReferencePose,names);
         _base = new AlsLocalPose[layout.Names.Length]; _overlay = new AlsLocalPose[_base.Length]; _pose = new AlsLocalPose[_base.Length];
         _baseCurves = new AlsInertialCurve[names.Length]; _overlayCurves = new AlsInertialCurve[names.Length]; _curves = new AlsInertialCurve[names.Length];
@@ -59,6 +63,12 @@ internal sealed class AlsLayerBlendingFrameStage : IAlsLayerBlendingSink
         _identity=context.Identity; _input=input; _count=0; Array.Clear(_updated); _prepared=true; _evaluated=false; _unvisited=!updateSource;
         try
         {
+            if(_refactored is not null)
+            {
+                _refactored.Prepare(context,CommittedIdentity,feedback,traversal,updateSource);
+                if(updateSource){_=BaseContext;_=OverlayContext;}
+                return;
+            }
             _bases.BeginCandidate(_identity,_sampler);
             _layer.Prepare(context.WithUpdateCounter(traversal.Update),input,feedback,_initialization,_bones,traversal.Evaluation,this,updateSource);
             // Both are relevant through the original curve tail, even with all
@@ -75,6 +85,7 @@ internal sealed class AlsLayerBlendingFrameStage : IAlsLayerBlendingSink
             throw new ArgumentException("Post Layering source frame/layout differs.");
         try
         {
+            if(_refactored is not null){_refactored.Evaluate(basePose,baseCurves,overlayPose,overlayCurves);_evaluated=true;return;}
             basePose.CopyTo(_base); overlayPose.CopyTo(_overlay); overlayCurves.CopyTo(_overlayCurves); Array.Clear(_baseCurves);
             for(var i=0;i<baseCurves.Length;i++) _baseCurves[_baseCurveMap[i]]=baseCurves[i];
             _layer.Evaluate(_pose,_curves); _evaluated=true;
@@ -84,11 +95,12 @@ internal sealed class AlsLayerBlendingFrameStage : IAlsLayerBlendingSink
     public void ValidateCommit(AlsFrameIdentity identity)
     {
         if(!_prepared || !(_evaluated || _unvisited) || identity!=_identity) throw new InvalidOperationException("Post Layering is not ready for commit.");
-        _layer.ValidateCommit(); _bases.ValidateCommit();
+        if(_refactored is not null)_refactored.ValidateCommit(identity);
+        else {_layer.ValidateCommit(); _bases.ValidateCommit();}
     }
     public void Commit(AlsFrameIdentity identity)
-    { ValidateCommit(identity); _layer.Commit(); _bases.Commit(); CommittedIdentity=identity; _committedTraversal=_candidateTraversal; _prepared=_evaluated=false; }
-    public void Cancel() { _layer.Cancel(); _bases.Cancel(); _prepared=_evaluated=false; }
+    { ValidateCommit(identity); if(_refactored is not null)_refactored.Commit(identity);else {_layer.Commit(); _bases.Commit();} CommittedIdentity=identity; _committedTraversal=_candidateTraversal; _prepared=_evaluated=false; }
+    public void Cancel() { _refactored?.Cancel(); _layer.Cancel(); _bases.Cancel(); _prepared=_evaluated=false; }
     private AlsPoseUpdateContext Context(int source) => _prepared && _updated[source] ? _contexts[source] : throw new InvalidOperationException("Missing linked input update.");
     private static int Source(string name) => name switch {"Base Layer Input"=>0,"Overlay Layer Input"=>1,"Base Poses Input"=>2,_=>throw new ArgumentException("Foreign linked input.")};
     public void InitializeInput(int nodeIndex,string name) { if(Source(name)==2) _bases.Initialize(_initialization); }

@@ -21,9 +21,9 @@ internal sealed class AlsPreciseRawAnimationSourceSampler
             policy.TransformCurveCount != 0 || policy.AnimatedBoneAttributeCount != 0)
             throw new ArgumentException("Precise source requires its full supported source policy and logical skeleton.");
         _source = source; _skeleton = skeleton;
-        _withReference = new(data, skeleton.LogicalParents, skeleton.PreciseReferencePose, skeleton.VirtualBones);
+        _withReference = new(data, skeleton.LogicalParents, skeleton.PreciseReferencePose, skeleton.VirtualBones, sampleRootMotion:AlsAnimationRuntimeOptions.SampleRootMotion);
         var authored = skeleton.PreciseReferencePose.ToArray(); policy.PreciseRetargetTransforms.CopyTo(authored);
-        _withoutReference = new(data, skeleton.LogicalParents, authored, skeleton.VirtualBones);
+        _withoutReference = new(data, skeleton.LogicalParents, authored, skeleton.VirtualBones, sampleRootMotion:AlsAnimationRuntimeOptions.SampleRootMotion);
         _retarget = new(skeleton.LogicalToPhysical,skeleton.TranslationRetargetModes.ToArray().Select(m=>(int)m).ToArray(),
             data.LogicalTrackPresence,skeleton.PreciseReferencePose,policy.PreciseRetargetTransforms,100);
         var animation = set.Animations[data.Identity.AnimationId];
@@ -52,7 +52,8 @@ internal sealed class AlsPreciseRawAnimationSourceSampler
         var key = (shouldRetarget ? _withReference : _withoutReference).Sample(seconds, pose);
         var policy = _source.Policy;
         _retarget.Apply(pose,shouldRetarget);
-        if (extractRootMotion && policy.EnableRootMotion || policy.ForceRootLock && !ignoreRootLock)
+        if (!AlsAnimationRuntimeOptions.SampleRootMotion) pose[0] = _skeleton.PreciseReferencePose[0];
+        else if (extractRootMotion && policy.EnableRootMotion || policy.ForceRootLock && !ignoreRootLock)
             pose[0] = policy.RootMotionRootLock switch
             {
                 AlsRawAnimationRootLock.RefPose => _skeleton.PreciseReferencePose[0],

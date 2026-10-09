@@ -20,12 +20,13 @@ public sealed class AlsRawSequencePoseSampler
     private readonly AlsLogicalPoseExpansion _expansion;
     private readonly AlsLocalPose[] _physicalReference, _physicalKey, _first, _second, _components;
     private int _sampling;
+    private readonly bool _sampleRootMotion;
     public AlsRawAnimationPoseData Data { get; }
 
     /// <param name="logicalReferencePose">The caller's actual extraction reference pose,
     /// including the native virtual-bone rest atoms. Missing tracks read this snapshot.</param>
     public AlsRawSequencePoseSampler(AlsRawAnimationPoseData data, ReadOnlySpan<int> logicalParents,
-        ReadOnlySpan<AlsLocalPose> logicalReferencePose, ReadOnlySpan<AlsLogicalVirtualBone> virtualBones)
+        ReadOnlySpan<AlsLocalPose> logicalReferencePose, ReadOnlySpan<AlsLogicalVirtualBone> virtualBones, bool sampleRootMotion = true)
     {
         ArgumentNullException.ThrowIfNull(data);
         if (logicalReferencePose.Length != data.LogicalBoneCount || virtualBones.Length != data.VirtualBoneCount)
@@ -35,6 +36,7 @@ public sealed class AlsRawSequencePoseSampler
                 throw new ArgumentException("Raw sampler virtual-bone order differs from its source keys.");
         _expansion = new(logicalParents, data.LogicalToPhysical, logicalReferencePose, virtualBones);
         Data = data;
+        _sampleRootMotion = sampleRootMotion;
         _physicalReference = new AlsLocalPose[data.PhysicalBoneCount];
         for (var physical = 0; physical < _physicalReference.Length; physical++)
             _physicalReference[physical] = logicalReferencePose[data.PhysicalToLogical[physical]];
@@ -70,7 +72,7 @@ public sealed class AlsRawSequencePoseSampler
     {
         var key = Data.GetPhysicalKey(index);
         for (var physical = 0; physical < _physicalKey.Length; physical++)
-            _physicalKey[physical] = Data.LogicalTrackPresence[Data.PhysicalToLogical[physical]] ? key[physical] : _physicalReference[physical];
+            _physicalKey[physical] = (_sampleRootMotion || Data.PhysicalToLogical[physical] != 0) && Data.LogicalTrackPresence[Data.PhysicalToLogical[physical]] ? key[physical] : _physicalReference[physical];
         _expansion.Expand(_physicalKey, output, _components, Data.GetVirtualKey(index), Data.VirtualTrackPresence);
     }
 

@@ -91,7 +91,11 @@ public static class AlsRawAnimationSourceCompiler
         Fields(request, ["definitionDigest", "bindingDigest", "players", "samples", "rootAssets"]);
         Require(Text(request, "definitionDigest") == set.DefinitionDigest && Text(request, "bindingDigest") == bindingDigest &&
             request.GetProperty("players").GetInt32() == playerCount && request.GetProperty("samples").GetInt32() == sampleCount,
-            "Raw source export belongs to another manifest or player/sample binding.");
+            $"Raw source export belongs to another manifest or player/sample binding: " +
+            $"definition={Text(request, "definitionDigest")}/{set.DefinitionDigest} " +
+            $"binding={Text(request, "bindingDigest")}/{bindingDigest} " +
+            $"players={request.GetProperty("players").GetInt32()}/{playerCount} " +
+            $"samples={request.GetProperty("samples").GetInt32()}/{sampleCount}.");
         var expected = roots.Select(id => set.Animations[id].StableId).ToHashSet(StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var byId = roots.ToDictionary(id => set.Animations[id].StableId, id => set.Animations[id], StringComparer.Ordinal);

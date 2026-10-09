@@ -20,6 +20,7 @@ public sealed class AlsMantlingPoseSource
     private readonly int[] _modes;
     private readonly AlsPrecisePose _lockedRoot;
     private readonly bool _enableRoot, _forceRoot;
+    private readonly bool _sampleRootMotion;
     public AlsRawAnimationPoseData Data { get; }
     public string SkeletonPath { get; }
     public string AnimationInputsDigest { get; }
@@ -29,13 +30,14 @@ public sealed class AlsMantlingPoseSource
 
     internal AlsMantlingPoseSource(AlsRawAnimationPoseData data,string skeleton,string[] names,int[] parents,
         AlsLogicalVirtualBone[] virtuals,AlsPrecisePose[] target,AlsPrecisePose[] source,int[] modes,
-        AlsPrecisePose lockedRoot,bool enableRoot,bool forceRoot,string digest)
+        AlsPrecisePose lockedRoot,bool enableRoot,bool forceRoot,string digest,bool sampleRootMotion=true)
     {
         Data=data;SkeletonPath=skeleton;AnimationInputsDigest=digest;_names=names.ToArray();_parents=parents.ToArray();_virtuals=virtuals.ToArray();
         _target=target.ToArray();_source=target.ToArray();
         if(source.Length<data.PhysicalBoneCount)throw new ArgumentException("Missing physical retarget references.");
         for(var physical=0;physical<data.PhysicalBoneCount;physical++)_source[data.PhysicalToLogical[physical]]=source[physical];
         _lockedRoot=lockedRoot;_enableRoot=enableRoot;_forceRoot=forceRoot;
+        _sampleRootMotion=sampleRootMotion;
         _retarget=new(data.LogicalToPhysical,modes,data.LogicalTrackPresence,target,source);
         _modes=modes.ToArray();
         // Validate topology now, rather than deferring malformed resources until playback.
@@ -44,6 +46,8 @@ public sealed class AlsMantlingPoseSource
 
     public Sampler CreateSampler()=>new(this);
     public Sampler CreateSampler(AlsMantlingCurveSource curves)=>new(this,curves);
+    internal AlsMantlingPoseSource WithRootMotionSampling(bool enabled)=>enabled==_sampleRootMotion ? this : new(Data,SkeletonPath,_names,_parents,_virtuals,_target,
+        Data.PhysicalToLogical.ToArray().Select(i=>_source[i]).ToArray(),_modes,_lockedRoot,_enableRoot,_forceRoot,AnimationInputsDigest,enabled);
 
     internal AlsMantlingPoseSource AdaptHostLayout(AlsRawAnimationSkeletonDefinition host,int animationId)
     {
@@ -78,7 +82,7 @@ public sealed class AlsMantlingPoseSource
         var data=new AlsRawAnimationPoseData(Data.Identity with {AnimationId=animationId,SkeletonId=host.SkeletonId},Data.FrameRateNumerator,
             Data.FrameRateDenominator,Data.SampledKeyCount,Data.PlayLength,Data.Interpolation,host.LogicalToPhysical,
             virtuals.Select(v=>v.Bone).ToArray(),presence,keys,new AlsLocalPose[Data.SampledKeyCount*virtuals.Length]);
-        return new(data,host.Source,names,parents,virtuals,target,source,modes,_lockedRoot,_enableRoot,_forceRoot,AnimationInputsDigest);
+        return new(data,host.Source,names,parents,virtuals,target,source,modes,_lockedRoot,_enableRoot,_forceRoot,AnimationInputsDigest,_sampleRootMotion);
     }
 
     /// <summary>One owner per sampler; resources can be shared by independent workers.</summary>
@@ -93,15 +97,16 @@ public sealed class AlsMantlingPoseSource
                 throw new ArgumentException("Mantle pose and curve resource versions differ.");
             _curves=curves;
             _owner=owner;
-            _target=new(owner.Data,owner._parents,owner._target,owner._virtuals);
-            _source=new(owner.Data,owner._parents,owner._source,owner._virtuals);
+            _target=new(owner.Data,owner._parents,owner._target,owner._virtuals,sampleRootMotion:owner._sampleRootMotion);
+            _source=new(owner.Data,owner._parents,owner._source,owner._virtuals,sampleRootMotion:owner._sampleRootMotion);
         }
         public AlsRawPoseKeySelection Sample(double seconds,bool retarget,bool extractRootMotion,bool ignoreRootLock,
             Span<AlsPrecisePose> output)
         {
             var keys=(retarget?_target:_source).Sample(seconds,output);
             _owner._retarget.Apply(output,retarget);
-            if(extractRootMotion&&_owner._enableRoot||_owner._forceRoot&&!ignoreRootLock) output[0]=_owner._lockedRoot;
+            if(!_owner._sampleRootMotion) output[0]=_owner._target[0];
+            else if(extractRootMotion&&_owner._enableRoot||_owner._forceRoot&&!ignoreRootLock) output[0]=_owner._lockedRoot;
             return keys;
         }
         public AlsRawPoseKeySelection Sample(double seconds,bool retarget,bool extractRootMotion,bool ignoreRootLock,

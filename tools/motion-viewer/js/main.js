@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Viewer, classifyBone, KIND_COLOR } from './viewport.js';
 import { analyzeClip, displacementRows, fmtNum, humanSize } from './stats.js';
+import { COMPARISON_SPACE } from './comparison-space.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -9,9 +10,20 @@ const state = {
   activeSlot: 'A', mode: 'single',
   loaded: { A: null, B: null },
   sidecar: { A: null, B: null },
+  chain: { items: [], chainStages: [], short: {}, filterText: '', selectedKey: null, viewers: {}, loaded: {} },
 };
 
 const viewers = {};
+let sharedCamera = null;
+let copyingCamera = false;
+function allViewers() { return [...Object.values(viewers), ...Object.values(state.chain.viewers)]; }
+function shareCamera(camera) {
+  if (copyingCamera) return;
+  copyingCamera = true;
+  sharedCamera = camera;
+  for (const v of allViewers()) v.applyCameraState(camera);
+  copyingCamera = false;
+}
 
 function showError(msg) {
   const bar = $('errBar');
@@ -28,19 +40,54 @@ async function fetchJSON(url) {
 
 function init() {
   viewers.A = new Viewer($('canvasA'), {
+    onCameraChange: shareCamera,
     onFrame: (t, dur) => onFrame('A', t, dur),
   });
   viewers.B = new Viewer($('canvasB'), {
+    onCameraChange: shareCamera,
     onFrame: (t, dur) => onFrame('B', t, dur),
   });
   bindUI();
-  void boot();
+  viewers.A.resetCamera();
+  void boot().then(() => {
+    // 默认进入链路比对模式（用户主用法）：等链路索引就绪后自动切换
+    if (!state.batchId && state.mode === 'single' && state.chain.items.length) {
+      ensureChainViewers();
+      toggleChainMode();
+    }
+  });
 }
 
-async function boot() {
+async function boot(batchId = null) {
+  const requestId = state.catalogRequest = (state.catalogRequest || 0) + 1;
+  for (const id of ['batchSelect', 'stageSelect', 'refreshBtn', 'chainBtn', 'modeBtn']) $(id).disabled = true;
   try {
-    const data = await fetchJSON('/api/stages');
+    const data = await fetchJSON('/api/stages'+(batchId ? '?batch='+encodeURIComponent(batchId) : ''));
+    if (state.catalogRequest !== requestId) return;
     state.stages = data.stages;
+    state.activePack = data.activePack;
+    state.batchId = data.authoringBatch?.id || null;
+    const batchSelect = $('batchSelect');
+    batchSelect.hidden = !data.batches?.length;
+    batchSelect.innerHTML = '';
+    for (const batch of data.batches || []) {
+      const option = document.createElement('option');
+      option.value = batch.id; option.textContent = batch.label+' · '+batch.status;
+      batchSelect.appendChild(option);
+    }
+    if (state.batchId) batchSelect.value = state.batchId;
+    const comparison = $('compareBatch'), previousComparison = comparison.value;
+    comparison.replaceChildren();
+    for (const batch of data.batches || []) {
+      const option = document.createElement('option'); option.value = batch.id; option.textContent = batch.label;
+      comparison.appendChild(option);
+    }
+    comparison.value = data.batches?.some(b=>b.id===previousComparison) ? previousComparison
+      : (data.batches || []).find(b=>b.id!==state.batchId)?.id || state.batchId;
+    $('serverInfo').textContent = state.batchId
+      ? `批次 · ${data.authoringBatch.status} · ${data.authoringBatch.label}`
+      : `固定原点 · cm · 活动包 ${data.activePack?.pack || '原版'}`;
+    $('serverInfo').title = $('serverInfo').textContent;
     const sel = $('stageSelect');
     sel.innerHTML = '';
     for (const s of state.stages) {
@@ -50,24 +97,302 @@ async function boot() {
       sel.appendChild(opt);
     }
     sel.value = state.stages[0].id;
-    await loadStage(state.stages[0].id);
+    await Promise.all([
+      loadStage(state.stages[0].id),
+      bootChain(),
+    ]);
+    if (state.batchId && state.files.length && state.mode !== 'chain') {
+      viewers.A.setPlaying(false);
+      $('playBtn').textContent = '播放';
+      await loadFile(state.files[0], 'A');
+      viewers.A.setTime(0);
+    }
   } catch (e) {
     showError('无法获取阶段目录：' + e.message);
+  } finally {
+    if (state.catalogRequest === requestId) {
+      for (const id of ['batchSelect', 'refreshBtn', 'chainBtn', 'modeBtn']) $(id).disabled = false;
+      $('stageSelect').disabled = state.mode === 'chain';
+    }
+  }
+}
+
+const CHAIN_STAGE_ORDER = ['kimodo-bvh', 'retarget-fbx', 'rootik-fbx', 'kimodo-godot', 'als-baseline'];
+const CHAIN_COLORS = { 'authoring-generated':'#35d96b', 'authoring-master':'#64b7ff', 'kimodo-bvh': '#35d96b', 'retarget-fbx': '#3d8bff', 'rootik-fbx': '#b44cff', 'kimodo-godot': '#ff3d81', 'als-baseline': '#ffb02e' };
+
+function assetGroupOf(key) {
+  const m = key.match(/^ALS_([A-Za-z]+)_/);
+  if (!m) return '其他';
+  const tag = m[1];
+  if (tag === 'CLF') return 'CLF 蹲';
+  if (tag === 'CRF') return 'CRF 跑姿';
+  if (tag === 'N') return 'N 站立';
+  if (tag === 'Props') return 'Props 道具';
+  if (tag === 'StanceVariation') return 'StanceVariation 姿态';
+  return tag;
+}
+
+async function bootChain() {
+  const requestId = state.chain.catalogRequest = (state.chain.catalogRequest || 0)+1;
+  try {
+    const query = new URLSearchParams({view:$('chainView').value, phase:$('comparePhase').value});
+    if (state.batchId) query.set('batch',state.batchId);
+    if ($('compareBatch').value) query.set('compare',$('compareBatch').value);
+    const data = await fetchJSON('/api/chain?'+query);
+    if (state.chain.catalogRequest !== requestId) return;
+    state.chain.items = data.items;
+    state.chain.chainStages = data.chainStages;
+    state.chain.short = data.short || {};
+    state.chain.columns = data.columns || [];
+    const compare = $('chainView').value==='batches';
+    $('compareBatch').hidden = $('comparePhase').hidden = !compare;
+    renderChainList();
+  } catch (e) {
+    showError('无法获取链路索引：' + e.message);
+  }
+}
+
+function renderChainList() {
+  const ul = $('chainList');
+  if (!ul) return;
+  const c = state.chain;
+  const f = c.filterText.toLowerCase();
+  ul.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  const groups = new Map();
+  for (const item of c.items) {
+    if (f && !item.key.toLowerCase().includes(f)) continue;
+    const g = assetGroupOf(item.key);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(item);
+  }
+  for (const [g, items] of groups) {
+    const gh = document.createElement('div');
+    gh.className = 'grp';
+    gh.textContent = g + ' · ' + items.length + ' 条';
+    frag.appendChild(gh);
+    for (const item of items) {
+      const li = document.createElement('li');
+      li.dataset.key = item.key;
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = item.key;
+      name.title = item.key;
+      li.appendChild(name);
+      const chips = document.createElement('span');
+      chips.className = 'chips';
+      for (const sid of c.chainStages) {
+        const on = !!item.stages[sid];
+        const chip = document.createElement('i');
+        chip.className = 'chip ' + (on ? 'on' : 'off');
+        chip.style.setProperty('--c', CHAIN_COLORS[sid] || '#888');
+        chip.title = (c.short[sid] || sid) + (on ? ' · 有' : ' · 无');
+        chips.appendChild(chip);
+      }
+      li.appendChild(chips);
+      li.onclick = () => selectChainAsset(item.key);
+      frag.appendChild(li);
+    }
+  }
+  ul.appendChild(frag);
+}
+
+function toggleChainMode() {
+  const chainOn = state.mode !== 'chain';
+  if (chainOn) {
+    if (state.mode === 'ab') toggleABMode();
+    state.mode = 'chain';
+    $('viewports').hidden = true;
+    $('vpChain').hidden = false;
+    $('chainBtn').classList.add('primary');
+    $('modeBtn').classList.remove('primary');
+    $('modeBtn').textContent = 'A/B 对比';
+    $('syncWrap').hidden = false;
+    $('syncLabel').textContent = ' 链路同步';
+    $('chainCluster').hidden = false;
+    $('fileSearch').hidden = true;
+    $('stageSelect').disabled = true;
+    $('fileList').hidden = true;
+    $('chainList').hidden = false;
+    $('stageMeta').hidden = true;
+    onResize();
+    if (!state.chain.selectedKey && state.chain.items.length) {
+      selectChainAsset(state.chain.items[0].key);
+    }
+  } else {
+    state.mode = 'single';
+    $('viewports').hidden = false;
+    $('vpChain').hidden = true;
+    $('chainBtn').classList.remove('primary');
+    $('chainCluster').hidden = true;
+    $('fileSearch').hidden = false;
+    $('stageSelect').disabled = false;
+    $('fileList').hidden = false;
+    $('chainList').hidden = true;
+    $('stageMeta').hidden = false;
+    $('syncLabel').textContent = ' A/B 同步';
+    $('syncWrap').hidden = true;
+    onResize();
+  }
+}
+
+async function selectChainAsset(key) {
+  showError('');
+  state.chain.selectedKey = key;
+  document.querySelectorAll('#chainList li[data-key]').forEach((li) => {
+    li.classList.toggle('sel', li.dataset.key === key);
+  });
+  const item = state.chain.items.find((it) => it.key === key);
+  if (!item) return;
+  renderChainSummary(item);
+  const c = state.chain;
+  const requestId = c.requestId = (c.requestId || 0) + 1;
+  for (const sid of c.chainStages) {
+    c.viewers[sid]?.clearScene();
+    c.loaded[sid] = null;
+  }
+  $('chainMeta').textContent = '加载链路…';
+  for (const id of ['timeSlider', 'firstFrameBtn', 'playBtn', 'exportOriginBtn']) $(id).disabled = true;
+  for (const sid of c.chainStages) {
+    const vp = c.viewers[sid];
+    const host = $('vpchain-' + sid);
+    if (!vp || !host) continue;
+    const entry = item.stages[sid];
+    if (!entry) {
+      vp.clearScene();
+      c.loaded[sid] = null;
+      const badge = host.querySelector('.vp-badge');
+      badge.textContent = '（本批未产出此阶段）';
+      badge.classList.add('muted');
+      continue;
+    }
+    const badge = host.querySelector('.vp-badge');
+    badge.classList.remove('muted');
+    badge.textContent = '加载中…';
+    const ext = entry.path.slice(entry.path.lastIndexOf('.')).toLowerCase();
+    const url = entry.url || '/file/' + encodeURIComponent(entry.path);
+    try {
+      const { takes } = await vp.load(url, entry.kind==='source-motion' ? '.source-motion' : ext, entry.name);
+      if (c.requestId !== requestId) return;
+      c.loaded[sid] = { file: entry, takes: takes.length };
+      badge.textContent = `${entry.name} · ${entry.qualification || takes.length+' take'}`;
+      vp.setPlaying(false); vp.setTime(0);
+    } catch (e) {
+      if (c.requestId !== requestId) return;
+      c.loaded[sid] = null;
+      badge.textContent = '（加载失败）';
+      showError(`加载失败 ${entry.name}：${e.message}`);
+    }
+  }
+  c.master = c.chainStages.find(sid=>c.loaded[sid]) || c.chainStages[0];
+  for (const sid of c.chainStages) $('vpchain-'+sid)?.classList.toggle('active',sid===c.master);
+  $('playBtn').textContent = '播放';
+  if ($('syncAB').checked) syncChainTo(0);
+  $('chainMeta').textContent = `链路就绪 · ${Object.values(c.loaded).filter(Boolean).length} 栏`;
+  for (const id of ['timeSlider', 'firstFrameBtn', 'playBtn', 'exportOriginBtn']) $(id).disabled = false;
+}
+
+function renderChainSummary(item) {
+  const rows = state.chain.chainStages.map((sid) => {
+    const e = item.stages[sid];
+    if (!e) return `<tr><td>${escapeHTML(state.chain.short[sid] || sid)}</td><td class="muted">无</td><td class="muted">—</td></tr>`;
+    const metrics = e.source?.metrics;
+    const measurement = metrics ? `root→O 最大 ${metrics.maximumRootHorizontalCm.toFixed(2)} cm · pelvis→root 最大 ${metrics.maximumPelvisRootHorizontalCm.toFixed(2)} cm` : '';
+    return `<tr><td>${escapeHTML(state.chain.short[sid] || sid)}</td><td>${escapeHTML(e.name)}<br><span class="muted">${escapeHTML(e.qualification || '')} ${measurement}</span></td><td class="num">${humanSize(e.size)}</td></tr>`;
+  }).join('');
+  $('tab-summary').innerHTML =
+    `<div class="muted small" style="margin-bottom:6px">链路资源 <b>${escapeHTML(item.key)}</b> 在各阶段的产物：</div>` +
+    `<table class="dataTable"><tr><th>阶段</th><th>文件</th><th class="num">大小</th></tr>${rows}</table>` +
+    `<div class="muted small" style="margin-top:8px">固定原点 · cm · 同一相机。当前批次的空阶段表示尚未产出／门禁阻断；独立对照栏不是本批上游。生成候选的静止 Root 只供显示，水平分解栏才有真实 root 轨道；ALS 原地栏锁定 root，保留 pelvis 自然残差。同步按时长比例，尚非支撑相位对齐。</div>`;
+  $('tab-sidecar').innerHTML = '<pre>'+escapeHTML(JSON.stringify(Object.fromEntries(Object.entries(item.stages).map(([sid,e])=>[sid,{file:e.path,sha256:e.sha256,source:e.source || null}])),null,2))+'</pre>';
+  document.querySelector('.tabBtn[data-tab="summary"]').click();
+}
+
+function ensureChainViewers() {
+  const c = state.chain;
+  const signature = c.chainStages.join('|');
+  if (c.viewerSignature === signature) {
+    for (const sid of c.chainStages) $('vpchain-'+sid).querySelector('.vp-label').textContent = c.short[sid] || sid;
+    return;
+  }
+  for (const viewer of Object.values(c.viewers)) {
+    viewer.clearScene(); viewer.controls.dispose(); viewer.renderer.dispose(); viewer.renderer.forceContextLoss();
+  }
+  $('vpChain').replaceChildren(); c.viewers = {}; c.loaded = {}; c.master = null; c.viewerSignature = signature;
+  for (const sid of c.chainStages) {
+    const host = document.createElement('div');
+    host.className = 'vp';
+    host.id = 'vpchain-' + sid;
+    const canvas = document.createElement('canvas');
+    host.appendChild(canvas);
+    const label = document.createElement('div');
+    label.className = 'vp-label';
+    label.textContent = c.short[sid] || sid;
+    host.appendChild(label);
+    const badge = document.createElement('div');
+    badge.className = 'vp-badge';
+    badge.textContent = '（未加载）';
+    host.appendChild(badge);
+    $('vpChain').appendChild(host);
+    const v = new Viewer(canvas, {
+      onCameraChange: shareCamera,
+      onFrame: (t, dur) => {
+        if (state.mode === 'chain' && state.chain.master === sid) updateTransport(t, dur);
+      },
+    });
+    host.addEventListener('mousedown', () => {
+      if (state.chain.master !== sid) {
+        state.chain.master = sid;
+        for (const s in c.viewers) {
+          const h = $('vpchain-' + s);
+          if (h) h.classList.toggle('active', s === sid);
+        }
+      }
+    });
+    c.viewers[sid] = v;
+    if (sharedCamera) v.applyCameraState(sharedCamera);
+    state.chain.master = state.chain.master || sid;
+  }
+  const first = c.chainStages[0];
+  if (first && $('vpchain-' + first)) $('vpchain-' + first).classList.add('active');
+}
+
+function syncChainTo(t) {
+  const c = state.chain;
+  const m = c.viewers[c.master];
+  if (!m?.action || !m?.clip) return;
+  const mDur = m.clip.duration || 1;
+  m.setTime(t);
+  syncChainToRatio(m.action.time / mDur);
+}
+
+function syncChainToRatio(ratio) {
+  const c = state.chain;
+  for (const sid of c.chainStages) {
+    if (sid === c.master) continue;
+    const v = c.viewers[sid];
+    if (!v?.action || !v?.clip) continue;
+    const dur = v.clip.duration || 1;
+    const target = Math.max(0, Math.min(ratio * dur, dur));
+    v.setTime(target);
   }
 }
 
 async function loadStage(stageId) {
+  const requestId = state.listRequest = (state.listRequest || 0) + 1;
   state.stageId = stageId;
   state.filterText = '';
   $('fileSearch').value = '';
   try {
-    const data = await fetchJSON('/api/list?stage=' + encodeURIComponent(stageId));
+    const data = await fetchJSON('/api/list?stage=' + encodeURIComponent(stageId)+(state.batchId ? '&batch='+encodeURIComponent(state.batchId) : ''));
+    if (state.listRequest !== requestId) return;
     state.files = data.files;
     const st = state.stages.find((s) => s.id === stageId);
     $('stageMeta').textContent =
       `${st ? st.desc : ''} · 共 ${data.count} 个文件` + (st && st.expect ? ` · 预期：${st.expect}` : '');
     renderFileList();
   } catch (e) {
+    if (state.listRequest !== requestId) return;
     state.files = [];
     renderFileList();
     showError('读取阶段清单失败：' + e.message);
@@ -78,14 +403,14 @@ function renderFileList() {
   const ul = $('fileList');
   ul.innerHTML = '';
   const f = state.filterText.toLowerCase();
-  const files = state.files.filter((x) => !f || x.path.toLowerCase().includes(f));
+  const files = state.files.filter((x) => !f || [x.path,x.name,x.semantic,x.node].join(' ').toLowerCase().includes(f));
   const frag = document.createDocumentFragment();
   for (const file of files) {
     const li = document.createElement('li');
     const name = document.createElement('span');
     name.className = 'name';
-    name.textContent = file.name;
-    name.title = file.path;
+    name.textContent = file.qualification ? `${file.name} · ${file.node.endsWith(':discovery') ? '发现候选' : file.qualification}` : file.name;
+    name.title = file.node ? file.node+' · '+file.path : file.path;
     const size = document.createElement('span');
     size.className = 'size';
     size.textContent = humanSize(file.size);
@@ -111,10 +436,10 @@ function renderFileList() {
 async function loadFile(file, slot) {
   const v = viewers[slot];
   const ext = file.path.slice(file.path.lastIndexOf('.')).toLowerCase();
-  const url = '/file/' + encodeURIComponent(file.path);
+  const url = file.url || '/file/' + encodeURIComponent(file.path);
   setActiveSlot(slot);
   showError('');
-  if (ext === '.json') {
+  if (ext === '.json' && file.kind!=='source-motion') {
     v.clearScene();
     state.loaded[slot] = { file, takes: 0 };
     $('badge' + slot).textContent = `${file.name} · JSON 文本`;
@@ -123,13 +448,15 @@ async function loadFile(file, slot) {
   }
   $('badge' + slot).textContent = '加载中…';
   try {
-    const { takes } = await v.load(url, ext, file.name);
+    const { takes } = await v.load(url, file.kind==='source-motion' ? '.source-motion' : ext, file.name);
     state.loaded[slot] = { file, takes: takes.length };
-    $('badge' + slot).textContent = `${file.name} · ${takes.length} take`;
+    $('badge' + slot).textContent = `${file.name} · ${file.qualification || takes.length+' take'}`;
     renderTabs(slot);
     renderClipSelect(slot, takes.length);
-    renderSidecar(slot, file);
+    if (file.source) $('tab-sidecar').innerHTML = '<pre>'+escapeHTML(JSON.stringify(file.source,null,2))+'</pre>';
+    else renderSidecar(slot, file);
   } catch (e) {
+    if (e.message === 'Load superseded') return;
     state.loaded[slot] = null;
     $('badge' + slot).textContent = '（加载失败）';
     showError(`加载失败 ${file.name}：${e.message}`);
@@ -295,18 +622,6 @@ function escapeHTML(s) {
 let frameCounter = 0;
 function onFrame(slot, t, dur) {
   if (state.mode === 'ab') {
-    if (state.syncAB && slot === 'A') {
-      const other = viewers.B;
-      if (other.action && other.clip) {
-        const oDur = other.clip.duration || dur || 1;
-        other.action.time = (t / (dur || 1)) * oDur;
-        if (!other.playing) {
-          other.action.paused = false;
-          other.mixer.update(0);
-          other.action.paused = true;
-        }
-      }
-    }
     if (slot === state.activeSlot) updateTransport(t, dur);
   } else if (slot === 'A') {
     updateTransport(t, dur);
@@ -327,38 +642,127 @@ function updateTransport(t, dur) {
 }
 
 function bindUI() {
+  $('chainBtn').onclick = () => { ensureChainViewers(); toggleChainMode(); };
+  $('chainSearch').oninput = (e) => {
+    state.chain.filterText = e.target.value;
+    renderChainList();
+  };
+  $('syncAB').onchange = (e) => {
+    state.syncAB = e.target.checked;
+  };
+  state.syncAB = $('syncAB').checked;
+  $('exportOriginBtn').onclick = () => {
+    const entries = state.mode === 'chain'
+      ? Object.entries(state.chain.viewers).filter(([sid]) => state.chain.loaded[sid])
+      : Object.entries(viewers).filter(([slot]) => state.loaded[slot]);
+    const report = { ...COMPARISON_SPACE, activePack: state.activePack, authoringBatch:state.batchId, mode: state.mode,
+      asset: state.mode === 'chain' ? state.chain.selectedKey : null,
+      stages: entries.map(([id, v]) => ({ id, file: state.mode === 'chain'
+        ? state.chain.loaded[id].file.path : state.loaded[id].file.path,
+        source:state.mode==='chain' ? state.chain.loaded[id].file.source : state.loaded[id].file.source,
+        ...v.originSnapshot() })) };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+    a.download = 'motion-origin-comparison.json'; a.click(); URL.revokeObjectURL(a.href);
+  };
   $('stageSelect').onchange = (e) => loadStage(e.target.value);
+  async function refreshBatch(batchId) {
+    const chainOn = state.mode==='chain', selectedKey = state.chain.selectedKey;
+    state.chain.requestId=(state.chain.requestId || 0)+1;
+    for (const viewer of allViewers()) viewer.clearScene();
+    state.loaded = {A:null,B:null}; state.chain.loaded = {}; state.chain.selectedKey = null;
+    $('badgeA').textContent = $('badgeB').textContent = '（未加载）';
+    for (const id of ['tab-summary', 'tab-bones', 'tab-disp', 'tab-sidecar']) $(id).textContent = '正在读取所选批次…';
+    $('fileList').replaceChildren(); $('chainList').replaceChildren();
+    $('clipSelect').hidden = true;
+    $('timeSlider').value = 0;
+    await boot(batchId);
+    if (chainOn) {
+      ensureChainViewers();
+      await selectChainAsset(state.chain.items.some(i=>i.key===selectedKey) ? selectedKey : state.chain.items[0]?.key);
+      onResize();
+    }
+  }
+  $('refreshBtn').onclick = () => refreshBatch(null);
+  $('batchSelect').onchange = (event) => refreshBatch(event.target.value);
+  async function refreshChain() {
+    const c = state.chain, key = c.selectedKey;
+    c.requestId = (c.requestId || 0)+1;
+    await bootChain(); ensureChainViewers();
+    await selectChainAsset(c.items.some(i=>i.key===key) ? key : c.items[0]?.key);
+    onResize();
+  }
+  for (const id of ['chainView','compareBatch','comparePhase']) $(id).onchange = refreshChain;
+  $('firstFrameBtn').onclick = () => {
+    const active = state.mode === 'chain' ? Object.values(state.chain.viewers) : Object.values(viewers);
+    for (const v of active) { v.setPlaying(false); v.setTime(0); }
+    $('playBtn').textContent = '播放';
+    $('timeSlider').value = 0;
+  };
   $('fileSearch').oninput = (e) => {
     state.filterText = e.target.value;
     renderFileList();
   };
-  $('modeBtn').onclick = toggleABMode;
+  $('modeBtn').onclick = () => {
+    if (state.mode === 'chain') toggleChainMode();
+    toggleABMode();
+  };
   $('playBtn').onclick = () => {
-    const v = viewers[state.activeSlot];
-    const play = !v.playing;
-    viewers.A.setPlaying(play);
-    viewers.B.setPlaying(play);
-    $('playBtn').textContent = play ? '暂停' : '播放';
+    if (state.mode === 'chain') {
+      const play = !Object.values(state.chain.viewers).some((v) => v.action && v.playing);
+      for (const sid in state.chain.viewers) state.chain.viewers[sid].setPlaying(play);
+      $('playBtn').textContent = play ? '暂停' : '播放';
+    } else {
+      const v = viewers[state.activeSlot];
+      const play = !v.playing;
+      viewers.A.setPlaying(play);
+      viewers.B.setPlaying(play);
+      $('playBtn').textContent = play ? '暂停' : '播放';
+    }
   };
   $('timeSlider').oninput = (e) => {
-    viewers[state.activeSlot].setTime(parseFloat(e.target.value));
-    if (state.mode === 'ab' && state.syncAB) syncTimeToB(parseFloat(e.target.value));
+    const t = parseFloat(e.target.value);
+    if (state.mode === 'chain') {
+      syncChainTo(t);
+      return;
+    }
+    viewers[state.activeSlot].setTime(t);
+    if (state.mode === 'ab' && state.syncAB) syncABTo(state.activeSlot, t);
   };
   $('speedSelect').onchange = (e) => {
     const s = parseFloat(e.target.value);
+    if (state.mode === 'chain') {
+      for (const sid in state.chain.viewers) state.chain.viewers[sid].setSpeed(s);
+      return;
+    }
     viewers.A.setSpeed(s);
     viewers.B.setSpeed(s);
   };
   $('loopChk').onchange = (e) => {
+    if (state.mode === 'chain') {
+      for (const sid in state.chain.viewers) state.chain.viewers[sid].setLoop(e.target.checked);
+      return;
+    }
     viewers.A.setLoop(e.target.checked);
     viewers.B.setLoop(e.target.checked);
   };
   $('upSelect').onchange = (e) => {
-    viewers[state.activeSlot].setUpAxis(e.target.value);
+    const axis = e.target.value;
+    if (state.mode === 'chain') {
+      for (const sid in state.chain.viewers) {
+        state.chain.viewers[sid].setUpAxis(axis);
+        state.chain.viewers[sid].resetCamera();
+      }
+      return;
+    }
+    viewers[state.activeSlot].setUpAxis(axis);
     viewers[state.activeSlot].resetCamera();
   };
-  $('resetCamBtn').onclick = () => viewers[state.activeSlot].resetCamera();
+  $('resetCamBtn').onclick = () => {
+    viewers.A.resetCamera();
+  };
   $('clipSelect').onchange = (e) => {
+    if (state.mode === 'chain') return;
     viewers[state.activeSlot].playTake(parseInt(e.target.value, 10));
     renderTabs(state.activeSlot);
   };
@@ -380,16 +784,11 @@ function bindUI() {
   window.addEventListener('resize', onResize);
 }
 
-function syncTimeToB(t) {
-  const a = viewers.A, b = viewers.B;
-  if (!a.action || !b.action || !a.clip || !b.clip) return;
-  const ratio = a.clip.duration ? t / a.clip.duration : 0;
-  b.action.time = ratio * (b.clip.duration || 0);
-  if (!b.playing) {
-    b.action.paused = false;
-    b.mixer.update(0);
-    b.action.paused = true;
-  }
+function syncABTo(sourceSlot, t) {
+  const source = viewers[sourceSlot], other = viewers[sourceSlot === 'A' ? 'B' : 'A'];
+  if (!source.action || !other.action || !source.clip || !other.clip) return;
+  const ratio = source.clip.duration ? t / source.clip.duration : 0;
+  other.setTime(ratio * (other.clip.duration || 0));
 }
 
 function toggleABMode() {
@@ -410,13 +809,50 @@ function toggleABMode() {
 function onResize() {
   viewers.A.resize();
   viewers.B.resize();
+  if (state.mode === 'chain') {
+    for (const sid in state.chain.viewers) state.chain.viewers[sid].resize();
+  }
 }
 
 const clock = new THREE.Clock();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.1);
-  viewers.A.update(dt);
-  if (state.mode === 'ab') viewers.B.update(dt);
+  if (state.mode === 'chain') {
+    if (!state.chain.viewers[state.chain.master]?.clip)
+      state.chain.master = Object.keys(state.chain.viewers).find(sid => state.chain.viewers[sid].clip);
+    const masterV = state.chain.viewers[state.chain.master];
+    if (masterV) masterV.update(dt);
+    const syncOn = $('syncAB').checked;
+    if (syncOn && masterV?.action && masterV?.clip) {
+      const ratio = masterV.action.time / (masterV.clip.duration || 1);
+      for (const sid in state.chain.viewers) {
+        if (sid === state.chain.master) continue;
+        const v = state.chain.viewers[sid];
+        if (v.action && v.clip) {
+          const dur = v.clip.duration || 1;
+          const target = ratio * dur;
+          v.setTime(target);
+        }
+        v.update(0);
+      }
+    } else {
+      for (const sid in state.chain.viewers) {
+        if (sid === state.chain.master) continue;
+        state.chain.viewers[sid].update(dt);
+      }
+    }
+  } else if (state.mode === 'ab' && state.syncAB) {
+    const master = viewers[state.activeSlot], other = viewers[state.activeSlot === 'A' ? 'B' : 'A'];
+    master.update(dt);
+    if (master.action && master.clip) syncABTo(state.activeSlot, master.action.time);
+    const playing = other.playing;
+    other.playing = false;
+    other.update(0);
+    other.playing = playing;
+  } else {
+    viewers.A.update(dt);
+    if (state.mode === 'ab') viewers.B.update(dt);
+  }
   requestAnimationFrame(tick);
 }
 

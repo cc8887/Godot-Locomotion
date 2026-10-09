@@ -1,4 +1,6 @@
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Animation;
+using GodotAls.Core.Events;
 using GodotAls.Core.Locomotion;
 using GodotAls.Import.Compilation;
 
@@ -17,6 +19,18 @@ internal sealed class AlsRefactoredDemoStances
     internal AlsRefactoredLocomotionHistory CommittedMotionHistory { get; private set; }
     private AlsRefactoredLocomotionHistory _nextMotionHistory;
     private AlsRefactoredLocomotionHost? _host;
+    private AlsRefactoredCharacterNotifyBinding? _notifyBinding;
+    internal void BindNotifies(AlsRefactoredCharacterNotifyBinding binding)
+    {
+        if (_host is not null || _notifyBinding is not null) throw new InvalidOperationException("Notify binding is immutable after construction.");
+        _notifyBinding = binding;
+    }
+    internal int ExtractNotifies(Span<AlsAdditionalSourceNotify> destination)
+    {
+        if (!_prepared || _notifyBinding is null) throw new InvalidOperationException("No original source notify frame.");
+        if (!_visited && !_post) PostUpdate(); // Complete the empty physical source tick once.
+        return _notifyBinding.Extract(_host!.Sources, destination);
+    }
     private AlsRefactoredCharacterActionRuntime? _runtime=>_host?.Actions;
     private ReadOnlySpan<string> NativeNames=>_locomotion.Pose.CurveNames;
     private readonly int[] _bones, _nativeCurves;
@@ -39,6 +53,7 @@ internal sealed class AlsRefactoredDemoStances
     internal int CommittedGroundedStateMask { get; private set; }
     internal long CommittedLocomotionFrames {get;private set;}
     internal int CommittedLocomotionStateMask {get;private set;}
+    internal int CommittedLocomotionState {get;private set;}=-1;
     internal long CommittedPivotNotifies { get; private set; }
     internal int CommittedMovementDetailsMask { get; private set; }
     internal long CommittedFootFeedbackFrames { get; private set; }
@@ -115,7 +130,7 @@ internal sealed class AlsRefactoredDemoStances
     {
         if (_prepared) throw new InvalidOperationException("Refactored Demo frame still pending.");
         _identity = frame.Identity; _delta = frame.DeltaTime;
-        _host ??= _locomotion.CreateRuntime(_identity.CharacterId, _identity.SlotGeneration);
+        _host ??= _locomotion.CreateRuntime(_identity.CharacterId, _identity.SlotGeneration, _notifyBinding?.Sources);
         _nextCounter = _counter.HasUpdated ? _counter.Next((ulong)frame.Identity.FrameId) : new(0, (ulong)frame.Identity.FrameId);
         var pending = _host.CommittedIdentity.SlotGeneration == 0;
         var velocity = AlsFootIkCoordinates.ToNative(frame.ActualVelocity);
@@ -193,7 +208,7 @@ internal sealed class AlsRefactoredDemoStances
         {var i=NativeNames.IndexOf(names[c]);if(i<0)throw new InvalidOperationException("Foreign stance curve.");_nativeValues[i]=values[c];curves[_nativeCurves[i]]=values[c];}
         foreach(var alias in _aliases)curves[alias.Legacy]=AlsStandingCycleCurves.Scale(_nativeValues[alias.Native],alias.Scale==0?_delta:alias.Scale);
     }
-    internal void PostUpdate(){if(!_prepared||_post)throw new InvalidOperationException("Invalid Demo post update.");_host!.PostUpdate();_post=true;}
+    internal void PostUpdate(){if(!_prepared)throw new InvalidOperationException("Invalid Demo post update.");if(_post)return;_host!.PostUpdate();_post=true;}
     internal void CaptureFeedback(ReadOnlySpan<string> names,ReadOnlySpan<AlsInertialCurve> curves)
     {
         if(!_prepared||names.Length!=curves.Length)throw new ArgumentException("Foreign Refactored feedback.");
@@ -217,7 +232,7 @@ internal sealed class AlsRefactoredDemoStances
             var details = _runtime.Standing.MovementDetailsState;
             if (details >= 0) CommittedMovementDetailsMask |= 1 << details;
         }
-        if(_visited){CommittedLocomotionFrames++;CommittedLocomotionStateMask|=1<<_host!.Graph.MainUpdate.State.CurrentState;}
+        if(_visited){CommittedLocomotionFrames++;CommittedLocomotionState=_host!.Graph.MainUpdate.State.CurrentState;CommittedLocomotionStateMask|=1<<CommittedLocomotionState;}
         _host!.Commit(id);
         if(groundedState>=0){CommittedGroundedFrames++;CommittedGroundedStateMask|=1<<groundedState;}
         if(_standing)CommittedStandingFrames++;if(_crouching)CommittedCrouchingFrames++;if(_evaluated&&groundedState>=0)CommittedTransitionFrames++;

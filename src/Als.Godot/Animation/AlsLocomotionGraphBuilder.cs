@@ -425,7 +425,7 @@ public static class AlsLocomotionGraphBuilder
         AlsLocomotionAnimationProfile profile, AlsPoseAnimationProfile? pose = null,
         AlsLocomotionSourceProfile? sourceProfile = null)
     {
-        static string Read(string name) => Godot.FileAccess.GetFileAsString($"res://assets/config/{name}");
+        static string Read(string name) => Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + $"{name}");
         pose ??= AlsPoseProfileCompiler.Compile(Read("p4_pose_profile.json"), set, profile);
         var p5 = AlsRecoveryActionProfileCompiler.Compile(Read("p5a_animation_runtime.json"), Read("p5_get_up_actions.json"), set);
         // The caller owns the source closure for the entire character transaction. Grounded
@@ -476,7 +476,7 @@ public static class AlsLocomotionGraphBuilder
             {
                 sourceBindings ??= CompileSourceBindings(animationSet, profile, poseProfile);
                 var refactoredMovementCurves = AlsAnimationRuntimeOptions.Has("--refactored-movement-curves") || AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") ?
-                    AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/refactored_pose_curve_inputs.json")) : null;
+                    AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "refactored_pose_curve_inputs.json")) : null;
                 standingCycle = new AlsStandingCycleGraph(library, profile, animationSet,
                     poseProfile is null ? "Grounded/Standing" : "Base/Grounded/Standing", ownedResources, sourceBindings, poseProfile, refactoredMovementCurves);
                 standing = Own(ownedResources, new AnimationNodeBlendTree());

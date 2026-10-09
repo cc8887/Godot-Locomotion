@@ -50,7 +50,7 @@ internal sealed class AlsCycleDetailGraph : IDisposable
     {
         _preciseCycle=new AlsPrecisePose[library.MovementSources(set,skeleton).BoneCount];
         _profile = AlsLocomotionDetailCompiler.Compile(Godot.FileAccess.GetFileAsString(
-            "res://assets/config/v4_locomotion_detail_graph.json"), set, skeleton);
+            GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_detail_graph.json"), set, skeleton);
         _players = players.Where(p => p.Domain == AlsLocomotionSourceDomain.Detail).OrderBy(p => p.DetailSlot).ToArray();
         _samples = _players.Select(p => samples[p.SampleStart]).ToArray();
         if (_players.Length != 16 || _players.Where((p, i) => p.DetailSlot != i || p.SampleCount != 1 ||

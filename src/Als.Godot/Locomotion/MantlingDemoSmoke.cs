@@ -26,9 +26,9 @@ public partial class MantlingDemoSmoke : Node
         try
         {
             var args = OS.GetCmdlineUserArgs();
-            _case = args.FirstOrDefault(a => a.StartsWith("--mantle-case="))?[14..] ?? "low";
+_case = args.FirstOrDefault(a => a.StartsWith("--mantle-case="))?[14..] ?? "low";
             _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--mantle-hz="))?[12..] ?? "60");
-            _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
+_capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
             if (_capture is not null) { Directory.CreateDirectory(_capture); RenderingServer.FramePostDraw += Capture; }
             Engine.PhysicsTicksPerSecond = _hz;
             _entry = new() { ConfigureBeforeReady = demo => demo.ConfigureRuntimePolicyForSmoke(

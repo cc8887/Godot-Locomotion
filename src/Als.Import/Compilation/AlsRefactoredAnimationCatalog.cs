@@ -13,12 +13,14 @@ public sealed record AlsRefactoredAnimationAsset(string Source,string Class,stri
 public sealed class AlsRefactoredAnimationCatalog
 {
     private readonly Func<string,byte[]> _read;
+    private readonly bool _sampleRootMotion;
     private readonly JsonElement _skeletons;
     public IReadOnlyDictionary<string,AlsRefactoredAnimationAsset> Assets { get; }
     public string IndexDigest { get; }
-    public AlsRefactoredAnimationCatalog(string indexJson,Func<string,byte[]> read)
+    public AlsRefactoredAnimationCatalog(string indexJson,Func<string,byte[]> read,bool sampleRootMotion=true)
     {
         ArgumentNullException.ThrowIfNull(read);_read=read;
+        _sampleRootMotion=sampleRootMotion;
         IndexDigest=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(indexJson)));
         using var document=JsonDocument.Parse(indexJson);var root=document.RootElement;
         if(root.GetProperty("schemaVersion").GetInt32()!=1||root.GetProperty("parentClass").GetString()!="/ALS/ALS/Character/AB_Als.AB_Als_C")
@@ -71,7 +73,8 @@ public sealed class AlsRefactoredAnimationCatalog
         var json=JsonSerializer.Serialize(new {schemaVersion=1,
             skeletons=new Dictionary<string,object>{{skeleton,new {metadata=_skeletons.GetProperty(skeleton)}}},
             sequences=rows.Select(p=>new {raw=p.GetProperty("raw"),evaluation=p.GetProperty("evaluation"),curves=p.GetProperty("curves")})});
-        var poses=AlsMantlingPoseCompiler.CompileCatalogAdditiveTargets(json,rows.Select(p=>p.GetProperty("source").GetString()!).ToArray());
+        var poses=AlsMantlingPoseCompiler.CompileCatalogAdditiveTargets(json,rows.Select(p=>p.GetProperty("source").GetString()!).ToArray())
+            .ToDictionary(p=>p.Key,p=>p.Value.WithRootMotionSampling(_sampleRootMotion));
         var curves=AlsMantlingCurveCompiler.CompileEmbedded(json);
         // UE GetSequencePose divides by sampled keys, not frame intervals.
         var baseTime=basis.GetProperty("evaluation").GetProperty("sequencePlayLength").GetDouble()*
@@ -90,7 +93,7 @@ public sealed class AlsRefactoredAnimationCatalog
         var json=JsonSerializer.Serialize(new {schemaVersion=1,
             skeletons=new Dictionary<string,object>{{skeleton,new {metadata=_skeletons.GetProperty(skeleton)}}},
             sequences=new[]{new {raw,evaluation=payload.GetProperty("evaluation")}}});
-        return AlsMantlingPoseCompiler.CompileAbsoluteSequences(json,[source])[source];
+        return AlsMantlingPoseCompiler.CompileAbsoluteSequences(json,[source])[source].WithRootMotionSampling(_sampleRootMotion);
     }
     public (AlsMantlingPoseSource Pose,AlsMantlingCurveSource Curves) CompileAbsolutePoseWithCurves(string source)
     {
@@ -101,6 +104,6 @@ public sealed class AlsRefactoredAnimationCatalog
         var json=JsonSerializer.Serialize(new {schemaVersion=1,
             skeletons=new Dictionary<string,object>{{skeleton,new {metadata=_skeletons.GetProperty(skeleton)}}},
             sequences=new[]{new {raw,evaluation=payload.GetProperty("evaluation"),curves=payload.GetProperty("curves")}}});
-        return (AlsMantlingPoseCompiler.CompileAbsoluteSequences(json,[source])[source],AlsMantlingCurveCompiler.CompileEmbedded(json)[source]);
+        return (AlsMantlingPoseCompiler.CompileAbsoluteSequences(json,[source])[source].WithRootMotionSampling(_sampleRootMotion),AlsMantlingCurveCompiler.CompileEmbedded(json)[source]);
     }
 }

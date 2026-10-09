@@ -17,6 +17,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
     private string? _captureDirectory;
     private Vector3 _airVelocity;
     private bool _forceBack;
+    private bool _forceFront;
     private string? _lifecycle;
     private bool _lifecycleCovered;
     private int _lifecycleInterrupted, _heldAccepted, _heldEnded;
@@ -43,6 +44,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
             _failure = args.Contains("--failure"); _mouse = Input.MouseMode;
             _interrupt = args.Contains("--interrupt");
             _forceBack = args.Contains("--back");
+            _forceFront = args.Contains("--front");
+            Require(!_forceBack || !_forceFront, "Select one controlled recovery facing.");
             _automatic = args.FirstOrDefault(a => a.StartsWith("--auto="))?[7..];
             Require(_automatic is null or "landing" or "roll", "Unknown automatic Ragdoll case.");
             _entryFailure = args.Contains("--entry-failure");
@@ -167,16 +170,16 @@ public partial class CharacterRagdollRecoverySmoke : Node
                         Require(simulation.Activation.Entry.CharacterVelocity.Y <= -10 && simulation.Activation.SpeedLimit.SpeedLimit >= 1000,
                             "Automatic landing used collision-clipped velocity for initial speed limiting.");
                 }
-                if (_forceBack && _cycles == 0)
+                if ((_forceBack || _forceFront) && _cycles == 0)
                 {
-                    // Controlled back-facing setup, not a claim about natural
+                    // Controlled facing setup, not a claim about natural
                     // falls: rigidly roll all character bodies around the pelvis.
                     var mesh = _demo.RuntimeContext.AnimationSet.SkeletalMeshes[_demo.RuntimeContext.Profile.MannequinMeshId];
                     var asset = AlsPhysicsAssetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_physics_asset_inputs.json"), mesh.ObjectPath);
                     var pelvis = asset.Bodies.Single(b => b.Bone.Equals("pelvis", StringComparison.OrdinalIgnoreCase)).Index;
                     var states = Enumerable.Range(0, simulation.Island.BodyCount).Select(simulation.Island.BodyAt).ToArray();
                     var pivot = states[pelvis].Actor;
-                    if (!simulation.DecideExit(true).FacingUpward)
+                    if (simulation.DecideExit(true).FacingUpward != _forceBack)
                     {
                         var rotation = pivot.Rotation * new AlsQuaternion(1, 0, 0, 0) * pivot.Rotation.Conjugate();
                         for (var i = 0; i < asset.Bodies.Length; i++)
@@ -185,7 +188,7 @@ public partial class CharacterRagdollRecoverySmoke : Node
                                 Rotation = rotation * states[i].Actor.Rotation }, Velocity = default };
                         simulation.Island.Reset(states);
                     }
-                    Require(simulation.DecideExit(true).FacingUpward, "Controlled back-facing setup failed.");
+                    Require(simulation.DecideExit(true).FacingUpward == _forceBack, "Controlled recovery-facing setup failed.");
                     character.FollowRagdollPelvis(); Tap(Key.G); character.ConsumeRagdollExit();
                     ArmRecoveryFailure(character); Next(2); return;
                 }

@@ -1,6 +1,7 @@
 using Godot;
 using NVector3 = System.Numerics.Vector3;
 using GodotAls.Core.Locomotion;
+using GodotAls.Core.Contracts;
 
 namespace GodotAls.Locomotion;
 
@@ -18,6 +19,40 @@ internal sealed class AlsSoleGeometryObserver
     public int LeftCount { get; }
     public int RightCount { get; }
     public float BindErrorMeters { get; }
+
+    // Measure the already-published skeleton, independently of the Rig's
+    // desired contacts. The complete support mesh determines penetration.
+    internal (AlsFootQualitySample Left, AlsFootQualitySample Right) CaptureQuality(
+        AlsFrameIdentity identity, long surfaceId, Transform3D surfaceToWorld, float surfaceTop,
+        bool leftContact, bool rightContact)
+    {
+        RequireMainThread();
+        foreach(var (skeleton,poses) in _poses)
+            for(var bone=0;bone<poses.Length;bone++)poses[bone]=skeleton.GetBoneGlobalPose(bone);
+        var inverse=surfaceToWorld.AffineInverse();
+        var left=Vector3.Zero;var right=Vector3.Zero;float leftMinimum=float.PositiveInfinity,rightMinimum=float.PositiveInfinity;
+        foreach(var point in _points)
+        {
+            var local=inverse*(point.Surface.Skeleton.GlobalTransform*Skin(point.Surface,point.Vertex,_poses[point.Surface.Skeleton]));
+            if(point.Left)left+=local;else right+=local;
+        }
+        foreach(var point in _supportPoints)
+        {
+            var local=inverse*(point.Surface.Skeleton.GlobalTransform*Skin(point.Surface,point.Vertex,_poses[point.Surface.Skeleton]));
+            if(point.Left)leftMinimum=MathF.Min(leftMinimum,local.Y-surfaceTop);else rightMinimum=MathF.Min(rightMinimum,local.Y-surfaceTop);
+        }
+        left/=LeftCount;right/=RightCount;
+        var leftSkeleton=_points.First(p=>p.Left).Surface.Skeleton;var rightSkeleton=_points.First(p=>!p.Left).Surface.Skeleton;
+        return (new(identity,surfaceId,leftContact,new(left.X*100d,left.Y*100d,left.Z*100d),leftMinimum*100d,Knee(leftSkeleton,"l")),
+            new(identity,surfaceId,rightContact,new(right.X*100d,right.Y*100d,right.Z*100d),rightMinimum*100d,Knee(rightSkeleton,"r")));
+        double Knee(Skeleton3D skeleton,string side)
+        {
+            var poses=_poses[skeleton];
+            var upper=poses[skeleton.FindBone("calf_"+side)].Origin-poses[skeleton.FindBone("thigh_"+side)].Origin;
+            var lower=poses[skeleton.FindBone("foot_"+side)].Origin-poses[skeleton.FindBone("calf_"+side)].Origin;
+            return Math.Acos(Math.Clamp(upper.Normalized().Dot(lower.Normalized()),-1d,1d));
+        }
+    }
 
     public AlsSoleGeometryObserver(Node root)
     {

@@ -24,7 +24,8 @@ public sealed record AlsManifest(
     [property: JsonRequired] AlsManifestAsset[] Curves,
     [property: JsonRequired] AlsManifestAsset[] ConfigAssets,
     [property: JsonRequired] AlsManifestFile[] Files,
-    [property: JsonRequired] AlsAuditSummary AuditSummary)
+    [property: JsonRequired] AlsAuditSummary AuditSummary,
+    AlsManifestKimodoSourceMarker? KimodoSourceMarker = null)
 {
     public const int CurrentSchemaVersion = 2;
 }
@@ -43,12 +44,25 @@ public sealed record AlsManifestAsset(
     [property: JsonRequired] string ClassPath,
     [property: JsonRequired] string? OutputPath,
     [property: JsonRequired] string[] Dependencies,
-    [property: JsonRequired] JsonElement Metadata);
+    [property: JsonRequired] JsonElement Metadata,
+    AlsManifestKimodoSource? KimodoSource = null);
 
 public sealed record AlsManifestFile(
     [property: JsonRequired] string RelativePath,
     [property: JsonRequired] string Sha256,
     [property: JsonRequired] long Size);
+
+public sealed record AlsManifestKimodoSource(
+    string Pipeline,
+    string SourceAnimPath,
+    string RetargetedAssetPath,
+    string FbxSha256);
+
+public sealed record AlsManifestKimodoSourceMarker(
+    string Variant,
+    string GeneratedBy,
+    int ReplacedAnimations,
+    int KeptOriginalAnimations);
 
 public sealed record AlsAuditSummary(
     [property: JsonRequired] string Status,

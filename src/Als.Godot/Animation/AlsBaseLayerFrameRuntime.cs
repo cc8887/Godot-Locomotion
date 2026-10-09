@@ -1,4 +1,5 @@
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Animation;
 using GodotAls.Core.Actions;
 using GodotAls.Core.Events;
 using GodotAls.Core.Locomotion;
@@ -32,7 +33,11 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
     private readonly AlsMontageNotifyBinding _turnNotifyBinding;
     private readonly AlsMontageNotifyRuntime _turnNotifies;
     private bool _cancelForRuntimeFailure;
-    private bool _legacySourceUpdate;
+    private readonly AlsRefactoredCharacterNotifyBinding? _characterNotifyBinding;
+    private readonly AlsAdditionalSourceNotify[] _originalNotifies = new AlsAdditionalSourceNotify[GodotAls.Core.Animation.AlsP5Runtime.SourceNotifyReferenceCapacity];
+    private int _originalNotifyCount;
+    internal long CommittedOriginalNotifyReferences { get; private set; }
+    internal long LegacyMovementUpdates => _movement.CommittedLegacyMovementUpdates;
     private readonly long[] _failureEpochs = new long[AlsActionOutcomeBuffer.Capacity];
     private int _failureEpochCount;
 
@@ -127,7 +132,7 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
         if (_motionPreparation != default) throw new InvalidOperationException("A montage tick is already pending.");
         BeginMantleMontages(identity, delta, ragdoll);
         _motionPreparation = identity; _motionPreparationDelta = delta;
-        var source = _montages.RootMotionRange;
+        var source = AlsAnimationRuntimeOptions.SampleRootMotion ? _montages.RootMotionRange : default;
         return _preparedRootMotion = new(identity, source.HasMotion ? source : default, _rootMotion.Read(source))
         { MantlingEnded = MantlePhysicalActionEnded() };
     }
@@ -160,7 +165,7 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
         var outcomes = HasMontageFrame ? _actions.Outcomes : default;
         // Resolve every fallible read before writing any part of the public result.
         var events = SourceEvents;
-        var motionSource = HasMontageFrame ? _montages.RootMotionRange : default;
+        var motionSource = HasMontageFrame && AlsAnimationRuntimeOptions.SampleRootMotion ? _montages.RootMotionRange : default;
         if (motionSource.HasMotion && motionSource.Identity != result.Identity)
             throw new InvalidOperationException("Root motion belongs to a different animation frame.");
         var motion = _preparedRootMotion.Identity == result.Identity ? _preparedRootMotion.Delta : _rootMotion.Read(motionSource);
@@ -210,10 +215,10 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
         if (_rollingGameplay && !definition.ActionPolicies.Any(p => p.DefinitionId == _rollDefinitionId))
             throw new InvalidOperationException("Rolling gameplay requires its compiled Roll action binding.");
         var refactoredDefinitions = AlsAnimationRuntimeOptions.Has("--refactored-pose-curves") ?
-            AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/refactored_pose_curve_inputs.json")) : null;
+            AlsRefactoredPoseCurveCompiler.Compile(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "refactored_pose_curve_inputs.json")) : null;
         if (refactoredDefinitions is not null)
             _refactoredPredictionModel = AlsRefactoredGroundPredictionCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/refactored_ground_prediction_inputs.json")).Model;
+                GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "refactored_ground_prediction_inputs.json")).Model;
         _airInput = definition.AirInput;
         _groundInput = definition.GroundedInput; _committedGroundInput = _groundInput.InitialState;
         _jumpInput = definition.JumpInput; _committedJumpInput = _jumpInput.InitialState;
@@ -245,6 +250,14 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
                 definition.AuthoredMontageAssets.SelectMany(a=>set.Animations[a.AnimationId].Curves).Select(c=>c.SourceName).Concat(_mantleResources?.CurveNames ?? []).ToArray(), contributor,
                 refactoredDefinitions, definition.GroundedEntryNotify.Binding);
             RefactoredStances?.BindOutputLayout(_movement.CurveNames);
+            if (RefactoredStances is { } original)
+            {
+                var firstHandle = definition.Binding.CreateCoreView().SourceOccurrences.Mappings.ToArray()
+                    .Select(m => m.OccurrenceHandleId).Concat(_turnNotifyBinding.Ranges.ToArray().Select(r => r.Handle)).DefaultIfEmpty(-1).Max() + 1;
+                _characterNotifyBinding = new(_turnNotifyBinding, AlsRefactoredDemoResources.Notifies.Value,
+                    firstHandle, GodotAls.Core.Sync.AlsSyncRuntime.MaxAssetSyncBatchSamples);
+                original.BindNotifies(_characterNotifyBinding);
+            }
             if (_mantleHost is not null)
             {
                 var skeleton = definition.RawSources.GetSkeleton(set.Animations[definition.AuthoredMontageAssets[0].AnimationId].SkeletonId);
@@ -453,12 +466,12 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
             {
                 frame.Validate(_identity); ArgumentNullException.ThrowIfNull(sink);
                 _sink=sink; _tail.PrepareUnvisited(frame); _tailPrepared=true;
-                _movement.PrepareUnvisited(_mappedResult,_mappedMovement,_mappedRules,WithTraversal(_mappedInputs,frame),frame,this,true);
+                if (RefactoredStances is null) _movement.PrepareUnvisited(_mappedResult,_mappedMovement,_mappedRules,WithTraversal(_mappedInputs,frame),frame,this,true);
+                else _movement.PrepareHidden(_identity,_mappedInputs.Grounded.Delta,true);
             }
             else _movement.PrepareHidden(_identity,_mappedInputs.Grounded.Delta,true);
             _turnNotifies.Complete(0);
-            _movement.PrepareEvents(_turnNotifyBinding,_turnNotifies.Notifies,_turnNotifies.DirectNotifies,
-                _failureEpochs.AsSpan(0, _failureEpochCount));
+            PrepareCharacterEvents();
             RefactoredStances?.PostUpdate();
             _phase=Phase.Unvisited;
         }
@@ -473,6 +486,15 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
     {
         if (frame.Identity!=context.Identity || frame.DeltaTime!=context.Delta)
             throw new ArgumentException("Mapped context differs from the input frame.");
+    }
+
+    private void PrepareCharacterEvents()
+    {
+        var count = RefactoredStances?.ExtractNotifies(_originalNotifies) ?? 0;
+        _originalNotifyCount=count;
+        _movement.PrepareEvents(_characterNotifyBinding ?? (IAlsMontageNotifyBinding)_turnNotifyBinding,
+            _turnNotifies.Notifies, _turnNotifies.DirectNotifies,
+            _failureEpochs.AsSpan(0, _failureEpochCount), _originalNotifies.AsSpan(0, count));
     }
 
     private void PrepareCore(in AlsFrameResult result, in AlsStandingMovementInput movement, in AlsGroundedRuleInput rules,
@@ -491,21 +513,23 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
             var sourceWeight = _mantleSlot is null ? 1 : _montages.SlotWeights(AlsMontageSlot.PostLocomotion).SourceWeight;
             _locomotionUpdated = SourceUpdated && sourceWeight > AlsPoseBlender.WeightThreshold;
             var sourceContext = update.Context.WithWeight(update.Context.Weight * sourceWeight, sourceWeight);
-            if (_locomotionUpdated)
+            if (RefactoredStances is { } original)
             {
-                _legacySourceUpdate=RefactoredStances is not null;
-                try{_movement.Prepare(result,movement,rules,inputs,sourceContext,this,physical,traversal);}
-                finally{_legacySourceUpdate=false;}
+                if (_locomotionUpdated) original.PrepareLocomotion(sourceContext,inputs.Grounded.Initialization,rules.FromRoll);
+                // Only the enclosing Overlay/Ragdoll contributors use the V4
+                // source bank. Its former movement state machines never tick.
+                _movement.PrepareHidden(_identity,context.Delta,true);
             }
+            else if (_locomotionUpdated) _movement.Prepare(result,movement,rules,inputs,sourceContext,this,physical,traversal);
             else if(traversal is { } frame)_movement.PrepareUnvisited(result,movement,rules,inputs,frame,this,physical);
             else _movement.PrepareHidden(_identity, context.Delta, physical);
-            if(_locomotionUpdated)RefactoredStances?.PrepareLocomotion(sourceContext,inputs.Grounded.Initialization,rules.FromRoll);
             if (physical)
             {
-                var visitedGround = SourceUpdated && _movement.GroundedReadCount > 0;
-                var standing = visitedGround && _grounded.Update.Standing.StandingUpdated &&
-                    UpdatesIdle(_grounded.Update.Standing.Standing);
-                var crouching = visitedGround && _grounded.Update.CrouchingUpdated && UpdatesIdle(_grounded.Update.Crouching.Machine);
+                var visitedGround = SourceUpdated && (RefactoredStances?.SourceUpdated ?? (_movement.GroundedReadCount > 0));
+                var standing = visitedGround && (RefactoredStances is { } nativeStanding
+                    ? nativeStanding.StandingState==0 : _grounded.Update.Standing.StandingUpdated && UpdatesIdle(_grounded.Update.Standing.Standing));
+                var crouching = visitedGround && (RefactoredStances is { } nativeCrouching
+                    ? nativeCrouching.CrouchingState==0 : _grounded.Update.CrouchingUpdated && UpdatesIdle(_grounded.Update.Crouching.Machine));
                 var relevant = (standing && _montages.SlotWeights(AlsTurnSlot.Standing).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 1 : 0) |
                     (crouching && _montages.SlotWeights(AlsTurnSlot.Crouching).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 2 : 0) |
                     (_authoredActions==true && _montages.SlotWeights(AlsMontageSlot.BaseLayer).SlotNodeWeight > AlsPoseBlender.WeightThreshold ? 4 : 0) |
@@ -513,8 +537,7 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
                 if (SourceUpdated && _mantleSlot is not null && _montages.SlotWeights(AlsMontageSlot.PostLocomotion).SlotNodeWeight > AlsPoseBlender.WeightThreshold)
                     relevant |= AlsMontageSlot.PostLocomotion.Mask;
                 _turnNotifies.Complete((ushort)relevant);
-                _movement.PrepareEvents(_turnNotifyBinding, _turnNotifies.Notifies, _turnNotifies.DirectNotifies,
-                    _failureEpochs.AsSpan(0, _failureEpochCount));
+                PrepareCharacterEvents();
             }
             _phase = Phase.Prepared;
         }
@@ -530,7 +553,7 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
             if (_locomotionUpdated)
             {
                 if(RefactoredStances is {} original)
-                {original.EvaluateLocomotion(_rawPrecise,_rawCurves,component);_movement.CompleteUpdateOnly();}
+                {original.EvaluateLocomotion(_rawPrecise,_rawCurves,component);}
                 else _movement.EvaluateRaw(_rawPrecise, _rawCurves, groundedSlot ?? (HasMontageFrame ? _groundedSlot : null));
             }
             if (SourceUpdated && _mantleSlot is not null)
@@ -556,6 +579,7 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
     {
         ValidateCommit(identity);
         _movement.Commit(identity);
+        CommittedOriginalNotifyReferences += _originalNotifyCount;
         RefactoredStances?.Commit(identity);
         if (_tailPrepared) _tail.Commit(identity);
         if (_mappedInputMode == true)
@@ -651,7 +675,6 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
         RequireUpdate();
         if (context.Identity != _identity || !float.IsFinite(seconds) || seconds < 0)
             throw new ArgumentException("Foreign or invalid frame inertialization request.");
-        if(_legacySourceUpdate)return;
         if (context.InertializationRequester != _requester) { _sink!.RequestInertialization(context, seconds); return; }
         _tail.RequestInertialization(context, seconds);
         _request = _request < 0 ? seconds : MathF.Min(_request, seconds); RequestCount++;

@@ -136,11 +136,11 @@ directional_shadow_max_distance = 48.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, -0.25, 1)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="World/StartFloor" unique_id=1186526252]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6071777, -0.43398404, -8.935524)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6071777, 0, -8.935524)
 shape = SubResource("Shape_floor")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="World/StartFloor" unique_id=343114600]
-transform = Transform3D(50, 0, 0, 0, 1, 0, 0, 0, 50, 0, -0.18011212, 0)
+transform = Transform3D(50, 0, 0, 0, 1, 0, 0, 0, 50, 0, 0.25, 0)
 mesh = SubResource("PlaneMesh_wvhbo")
 
 [node name="ContinuousSlope" type="StaticBody3D" parent="World" unique_id=802873352]

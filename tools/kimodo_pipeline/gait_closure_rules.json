@@ -1,0 +1,20 @@
+{
+  "extends": "non_prop_rules.json",
+  "reuseModel": true,
+  "torchThreads": 2,
+  "gaitClosure": {
+    "Walk_Forward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1,
+      "targetCleanup": true
+    },
+    "Run_Forward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1
+    },
+    "Crouch_Walk_Forward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1
+    }
+  }
+}

@@ -1,6 +1,7 @@
 using Godot;
 using GodotAls.Core.Contracts;
 using GodotAls.Dispatch;
+using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Locomotion;
 
@@ -25,11 +26,20 @@ public partial class RefactoredStanceDemoSmoke : Node
     private string? _capture;
     private readonly List<int> _captures=[];
     private Input.MouseModeEnum _mouse;
+    private AlsSoleGeometryObserver? _sole;
+    private StaticBody3D? _qualityFloor;
+    private float _qualityTop;
+    private AlsFootQualityMetrics _leftQuality,_rightQuality;
+    private AlsFootQualityMetrics _leftPlanted,_rightPlanted;
+    private AlsFootQualityMetrics _leftStandingWindow,_rightStandingWindow;
+    private bool _legacyLayering;
+    private long _nativeNotifies,_nativeLayers,_footsteps;
     public override void _Ready()
     {
         try
         {
             var args=OS.GetCmdlineUserArgs();_hz=int.Parse(args.FirstOrDefault(a=>a.StartsWith("--stance-hz="))?[12..]??"60");
+            _legacyLayering=args.Contains("--legacy-layering");
             if(_hz is not(30 or 60 or 120))throw new ArgumentException("Invalid stance test frequency.");
             Engine.PhysicsTicksPerSecond=_hz;_mouse=Input.MouseMode;
             _capture=args.FirstOrDefault(a=>a.StartsWith("--capture-dir="))?[14..];
@@ -42,6 +52,11 @@ public partial class RefactoredStanceDemoSmoke : Node
             foreach(var child in world.GetChildren())if(child.Name!="StartFloor")DisableTerrain(child);
             var floor=world.GetNode<StaticBody3D>("StartFloor");
             floor.GetNode<CollisionShape3D>("CollisionShape3D").Shape=new BoxShape3D {Size=new(100,.5f,100)};
+            if(args.Contains("--foot-quality"))
+            {
+                _sole=new(_entry.Demo.ActiveCharacter.PhysicalDisplaySkeleton.GetParent());
+                _qualityFloor=floor;_qualityTop=floor.GetNode<CollisionShape3D>("CollisionShape3D").Position.Y+.25f;
+            }
             ProcessThreadGroup=ProcessThreadGroupEnum.MainThread;ProcessThreadGroupOrder=AlsP3FrameStages.Observe+1;
         }
         catch(Exception e){Fail(e);}
@@ -92,6 +107,20 @@ public partial class RefactoredStanceDemoSmoke : Node
             if (At(1580)) Input.ActionRelease("aim");
             if(stage>30&&stage<430&&_tick%4==0)demo.OrbitCamera.ApplyMouseMotion(new(2,0));
             var full=character.FullMovementDiagnostics;var frame=character.Diagnostics;
+            _nativeNotifies=full.RefactoredSourceNotifyReferences;_nativeLayers=full.RefactoredLayeringFrames;
+            for(var e=0;e<frame.Result.TypedEvents.Count;e++)if(frame.Result.TypedEvents[e].Kind==AlsTimelineEventKind.Footstep)_footsteps++;
+            if(_sole is not null&&full.Identity!=default)
+            {
+                var sample=_sole.CaptureQuality(full.Identity,(long)_qualityFloor!.GetInstanceId(),_qualityFloor.GlobalTransform,_qualityTop,
+                    frame.Result.ResolvedLocomotionState==AlsLocomotionState.Grounded&&full.RefactoredRig.Left.Location.ContactApplied,
+                    frame.Result.ResolvedLocomotionState==AlsLocomotionState.Grounded&&full.RefactoredRig.Right.Location.ContactApplied);
+                _leftQuality=_leftQuality.Advance(sample.Left,delta);_rightQuality=_rightQuality.Advance(sample.Right,delta);
+                var locks=full.RefactoredLocks;
+                _leftPlanted=_leftPlanted.Advance(sample.Left with {Contact=sample.Left.Contact&&locks.Left.Amount>=.999f&&!locks.Left.ThighConstrained&&!locks.Left.FootConstrained},delta);
+                _rightPlanted=_rightPlanted.Advance(sample.Right with {Contact=sample.Right.Contact&&locks.Right.Amount>=.999f&&!locks.Right.ThighConstrained&&!locks.Right.FootConstrained},delta);
+                _leftStandingWindow=_leftStandingWindow.Advance(sample.Left with {Contact=_leftPlanted.Previous.Contact&&stage>=560&&stage<640},delta);
+                _rightStandingWindow=_rightStandingWindow.Advance(sample.Right with {Contact=_rightPlanted.Previous.Contact&&stage>=560&&stage<640},delta);
+            }
             if (full.Identity.SlotGeneration != 0)
             {
                 if (full.RefactoredMotion.Identity != full.Identity || full.FootMotion != full.RefactoredMotion)
@@ -134,6 +163,16 @@ public partial class RefactoredStanceDemoSmoke : Node
             _previousStage=stage;
             if(stage>=1700)
             {
+                if(_nativeNotifies==0||(_legacyLayering?_nativeLayers!=0:_nativeLayers<_hz*12)||_footsteps==0||full.LegacyMovementUpdates!=0)throw new Exception("Native source queue or selected Layering never reached production, or legacy movement still ticks.");
+                GD.Print($"ALS_PRODUCTION_NOTIFY_LAYER_OK sources={_nativeNotifies} layers={_nativeLayers} footsteps={_footsteps}");
+                if(_sole is not null)
+                {
+                    if(_leftQuality.ConsecutiveSamples<10||_rightQuality.ConsecutiveSamples<10)throw new Exception("Missing measured mesh contact windows.");
+                    GD.Print("ALS_FINAL_MESH_QUALITY "+System.Text.Json.JsonSerializer.Serialize(new {Left=_leftQuality,Right=_rightQuality,
+                        PlantedLeft=_leftPlanted,PlantedRight=_rightPlanted,
+                        StandingWindowLeft=_leftStandingWindow,StandingWindowRight=_rightStandingWindow,
+                        Scope="All support vertices, fixed sole centroid, surface-local cm. ContactApplied includes partial locks; Planted requires lock >= .999 with neither angle constraint. Deliberate 15cm perturbations included; no force measurement"}));
+                }
                 if (_footFeedback < _hz * 15)
                     throw new Exception($"Missing global foot feedback: {_footFeedback}.");
                 if (_standingDynamic == 0 || !_crouchDisplaced || _dynamicRequests <= _beforeCrouchDisplacement)

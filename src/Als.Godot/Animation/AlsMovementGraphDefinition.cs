@@ -181,5 +181,5 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
         return definition with { RawSources = rawSources, AimRawSources = aimSources, OverlayRawSources = overlaySources,
             RagdollRawSources = ragdollSources, StopRawSources = stopSources };
     }
-    private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
+    private static string Read(string name) => Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + name);
 }

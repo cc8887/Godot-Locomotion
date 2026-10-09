@@ -6,7 +6,7 @@ namespace GodotAls.Animation;
 internal sealed class AlsMantlingDemoResources
 {
     internal static readonly Lazy<AlsMantlingDemoResources> Shared = new(() => new());
-    internal static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name + ".json");
+    internal static string Read(string name) => Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "" + name + ".json");
     internal readonly string AnimationJson = Read("refactored_mantle_animation_inputs");
     internal readonly AlsMantlingMontageProfile Montages;
     internal readonly AlsMantlingMotionProfile Motion;
@@ -15,7 +15,7 @@ internal sealed class AlsMantlingDemoResources
     private AlsMantlingDemoResources()
     {
         var roots = Read("refactored_mantle_root_tracks");
-        Montages = AlsMantlingMontageCompiler.Compile(AnimationJson, roots, Read("refactored_mantle_curves"));
+        Montages = AlsMantlingMontageCompiler.Compile(AnimationJson, roots, Read("refactored_mantle_curves"), AlsAnimationRuntimeOptions.SampleRootMotion);
         Motion = AlsMantlingMotionCompiler.Compile(Read("refactored_mantle_inputs"), roots, Read("refactored_mantle_blends"));
         MontageCurves = AlsMantlingCurveCompiler.CompileMontages(Read("refactored_mantle_montage_curves"), AnimationJson);
         CurveNames = Montages.Curves.Values.Concat(MontageCurves.Values).SelectMany(c => c.Names.ToArray()).Distinct().ToArray();

@@ -10,6 +10,7 @@ internal sealed class AlsMontageRootMotionReader
     private readonly Dictionary<int, AlsRawRootMotionSampler> _sources = new();
     public AlsMontageRootMotionReader(AlsMovementGraphDefinition definition)
     {
+        if (!AlsAnimationRuntimeOptions.SampleRootMotion) return;
         foreach (var asset in definition.AuthoredMontageAssets)
         {
             if (!asset.RootMotionEnabled || _sources.ContainsKey(asset.AnimationId)) continue;
@@ -21,7 +22,7 @@ internal sealed class AlsMontageRootMotionReader
             _sources.Add(asset.AnimationId, new(source.PoseData, skeleton.PreciseReferencePose[0], policy.UseNormalizedRootMotionScale));
         }
     }
-    internal AlsPrecisePose ExtractFbx(in AlsMontageRootMotionRange range) => !range.HasMotion ? AlsPrecisePose.Identity
+    internal AlsPrecisePose ExtractFbx(in AlsMontageRootMotionRange range) => !AlsAnimationRuntimeOptions.SampleRootMotion || !range.HasMotion ? AlsPrecisePose.Identity
         : _sources[range.AnimationId].Extract(range.StartSeconds, range.EndSeconds);
     public AlsRootMotionDelta Read(in AlsMontageRootMotionRange range)
     {

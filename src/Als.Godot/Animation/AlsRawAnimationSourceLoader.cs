@@ -6,7 +6,19 @@ namespace GodotAls.Animation;
 internal static class AlsRawAnimationSourceLoader
 {
     private const string ConfigDirectory = "res://assets/config/";
-    private const string GeneratedDirectory = "res://assets/generated/als_v4_raw/";
+    private static readonly string GeneratedDirectory = ResolveGeneratedDirectory();
+
+    // Generated raw-source override directory; digest gate below still decides whether it wins.
+    private static string ResolveGeneratedDirectory()
+    {
+        var directory = System.Environment.GetEnvironmentVariable("ALS_RAW_SOURCE_GENERATED_DIR");
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return GodotAls.Import.AlsAnimationResourcePack.RawRoot ?? "res://assets/generated/als_v4_raw/";
+        }
+
+        return directory.TrimEnd('/') + "/";
+    }
 
     public static int[] CollectRoots(AlsAnimationSetDefinition set, AlsMovementGraphDefinition definition)
     {

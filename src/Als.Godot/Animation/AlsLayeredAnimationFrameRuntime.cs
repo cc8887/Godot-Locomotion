@@ -31,6 +31,7 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
         ? _refactoredFeet.CandidateRigInput : throw new InvalidOperationException("No Refactored foot rig.");
     public AlsRefactoredFootRigPose CommittedRefactoredRigFeet => _refactoredFeet?.CommittedRigFeet ?? default;
     public bool UsesRefactoredFeet => _refactoredFeet is not null;
+    internal long RefactoredLayeringFrames => _layer.RefactoredFrames;
     public AlsRefactoredFootRigState CandidateRefactoredRig => _refactoredFeet?.CandidateRig ?? default;
     public AlsBasedFootLockFrameState CandidateRefactoredLocks => _refactoredFeet?.CandidateLocks ?? default;
     public AlsBasedFootLockFrameState CommittedRefactoredLocks => _refactoredFeet?.CommittedLocks ?? default;
@@ -143,6 +144,7 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
                 .Concat(definition.AimRawSources.Sources.ToArray().SelectMany(s=>s.Policy.FloatCurveNames.ToArray()))
                 .Concat(rootSources ? definition.RagdollRawSources.Sources.ToArray().SelectMany(s=>s.Policy.FloatCurveNames.ToArray()) : [])
                 .Concat(["Enable_Transition","RotationAmount","Weight_Gait","Weight_InAir","Enable_SpineRotation"])
+                .Concat(AlsAnimationRuntimeOptions.Has("--refactored-layering-frame") ? AlsRefactoredLayeringInputModel.CurveNames.ToArray() : [])
                 .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
             _enableTransition=Array.IndexOf(_names,"Enable_Transition"); _rotationAmount=Array.IndexOf(_names,"RotationAmount");
             _committedCurves = new AlsInertialCurve[_names.Length]; _overlayCurves = new AlsInertialCurve[_names.Length];
@@ -157,8 +159,8 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
             {
                 if (enableRefactoredFeet)
                     _refactoredFeet = AlsFootRigCompiler.CreateAnimationFrame(
-                        Godot.FileAccess.GetFileAsString("res://assets/config/refactored_foot_rig_inputs.json"),
-                        Godot.FileAccess.GetFileAsString("res://assets/config/refactored_foot_environment_inputs.json"),
+                        Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "refactored_foot_rig_inputs.json"),
+                        Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "refactored_foot_environment_inputs.json"),
                         skeleton.LogicalBoneNames.ToArray(), skeleton.LogicalParents, skeleton.PreciseReferencePose, _names, captureBasedTrace,
                         AlsBasedFootLockSettings.Default with { BaseRotationMode = baseRotationMode, PinFinalContact = pinFinalContact,
                             CorrectUnplantedPenetration = correctUnplantedPenetration, PinContactToes = pinContactToes },

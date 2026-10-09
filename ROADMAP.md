@@ -1,6 +1,50 @@
 # Lyra 当前目标：可玩的 locomotion 与 ALS/Core 复用（2026-10-04）
 
+2026-10-09 Walk/Idle 上身一致性：新增放松肩膀、手臂贴身和小幅前后摆动提示词，修正原版参考到SOMA的A/T中性基准不互逆（限定手臂、保留下肢/root），加入实际生成Idle相对作者检查及发布身份/摘要验证。同种子A/B/C/D证实只改提示词无明显改善，修正条件后上臂中位由约66°降至约22–25°。实际重生成前进/左前两个Walk、程序化派生其余侧向，显式复用43个其他成功输入并重跑完整管线；160项Python、10个目标Walk、123个最终FBX回读通过。普通起停4/4进程、2/2脚底对照、152张截图通过，新旧同帧对照中的展臂已改善。完整71场景执行70项通过、246张截图/112张方向帧身份及三模式28段脚底对照通过；自动翻滚接地恢复仍失败，60个非道具源缺失，部分包未启用，默认v8未改。下一步关闭恢复失败与缺失母动作，并扩展种子/上身风格人工验收；不得将本轮Walk改善视作全新包通过。见[上身生成合同](docs/architecture/kimodo-idle-consistent-arms.md)和[生成/转换/截图闭环证据](docs/verification/2026-10-09-kimodo-idle-consistent-arms.md)。
+
+2026-10-09 目标竖直相位／接触 IK：已按足底周期极值先识别候选支撑，再有界固定骨长 IK，最后执行原有目标门禁；相位/修复失败保留输入交由严格质量检查，避免形成新的前置硬门禁。最新源本批重出125个目标资产，10个Walk几何及ALS协议通过，125个最终FBX逐键回读通过；155项Python和真实原版反例回归通过。前进/左前起停4/4进程、2/2最终脚底对照、152张截图通过。完整71场景已执行，初轮69/71通过；方向测试鼠标干扰及漏采已修正，最终正常绘制112张截图、三模式28段原版脚底对照和角色物理一致性通过。自动翻滚后接地回归已在原版/旧包/新包对照中复现，尚未关闭；新Walk展臂、58个源缺失及2个检查覆盖缺口仍在，默认v8保持。下一步定位翻滚进入物理时的初始接触状态，修正上身参考姿态/约束和缺失母动作；不得将腿部修复局部通过宣称为完整新包验收。见[算法合同](docs/architecture/kimodo-target-vertical-phase-ik.md)和[本批闭环证据](docs/verification/2026-10-09-kimodo-target-phase-ik.md)。
+
+2026-10-09 默认完整纯脚本 Pipeline：生成入口默认非道具修订规则，源 DAG 后继续目标转换、Root/Pelvis 分解/独立曲线、最终 FBX 逐键回读、Godot 导入/六域请求与完整运行矩阵，不启动 UE。本批继续最新源交付，实际转换 125/183（61 V4、64 Refactored），84 份根轨迹、125 FBX/316608 骨骼采样回读通过；147 项 Python 回归及最后 7 项离线回归通过。71/71 场景运行检查、28 段方向脚底原版对照、三 Hz 单/并行摘要通过，矩阵 246 张截图，另有 Walk/松键对照 188 张；1455 发布载荷未变。同批 Viewer 已接入 V4 四目标阶段。仍缺 58 个源身份、12 个目标检查失败/不支持，真实新 Walk 稳态展臂视觉失败；诊断整链完成但拒绝启用，默认 v8 未改。下一步核查参考姿态到 SOMA 中性姿态映射和上身约束、接触重定向及缺失母动作，再生成完整闭包；不得把本次部分包运行检查称为全新资源验收。见[完整离线合同](docs/architecture/kimodo-full-offline-pipeline.md)与[转换/运行及视觉失败证据](docs/verification/2026-10-09-kimodo-full-offline-pipeline.md)。
+
+2026-10-09 非道具新一轮生成：独立 seed 20261009，实际 47 份推理输出合并保留 45 个当前候选、125/183 个源交付身份；前进/四侧向 Walk 与纯侧蹲走左右共 7 条源周期通过，剩余 58 个身份因质量/依赖阻断。修复两个约束输入分支并保留原失败，140 项 Python 回归、292 回执/814 输出摘要审计通过；Viewer 最新批次已登记并保存固定原点首帧及新旧母动作对照。没有目标转换/Root 分解/Godot E2E或激活，默认仍 v8；下一步关闭 Run/后退/蹲姿/Sprint 母动作后再出目标阶段。见[本轮生成与失败边界](docs/verification/2026-10-09-kimodo-nonprop-regeneration-v1.md)。
+
+2026-10-09 Motion Viewer 链路对照：支持两个批次同阶段和当前批次六生产阶段，缺失制品留空，活动包/原版独立标注；接入 v5 的 88 个非道具身份/352 个真实目标制品及 ownership 回执，stage/finalize-fbx 自动登记。实际 LF 目标 pelvis→root 峰值 351.83→2.33 cm，翻滚 root 轨迹 61.44 cm；最新失败源批次尚无目标分解，默认活动仍 v8。136 项管线与相关目标/服务器/原点回归通过，真实浏览器对照有截图。仅改可见性，未重出或激活；后续仍需修正 LF 语义和剩余 Run/Sprint 源门禁。见[跨批次/阶段证据](docs/verification/2026-10-09-kimodo-viewer-batch-stage-chain.md)。
+
+2026-10-09 Motion Viewer 最新生成可见性：已将原生 NPZ 节点回执导出/登记加入生产结束流程，Viewer 默认最近登记批次，提供源候选／本批母动作、批次选择、刷新和未发布状态；历史①②③与活动包④明确区分。上一轮最新 3 个失败候选与前一批 8 个源通过母动作已接入，134 项 Pipeline、3 项服务器、3 项原点回归通过，真实浏览器首帧与源 FK 一致。仅修复可见性，未重新生成或激活；用户新指出的 LF 朝向语义、加速阶段与完整循环问题仍待修正后重出/验收。见[本批验证与截图](docs/verification/2026-10-09-kimodo-viewer-latest-authoring.md)。
+
+2026-10-09 Kimodo 侧向步态／Sprint 加速：已将纯侧移、稳态提示词、三周期姿态／脚锚／手部条件和同周期反向镜像固化到生产 DAG，并修复已验收 NPZ 反复归一化导致派生摘要失效的问题。真实最终规则 13 个方向母动作中 8 个 Walk／Crouch 循环通过源作者检查；4 个 Run 及 Sprint 加速仍因接缝或滑移被拒绝。131 项 Python 和 16 个原版几何正向身份通过，提供同原点 40 帧 FK 对照与循环预览；未执行新目标重定向／Godot E2E，未激活新包。下一步先关闭剩余 5 个母动作，再重出依赖和目标资产并执行普通移动矩阵。见[生成合同](docs/architecture/kimodo-directional-gait-generation.md)与[本批结果及预览](docs/verification/2026-10-09-kimodo-directional-gait-regeneration.md)。
+
+2026-10-08 Kimodo 水平所有权已实现：目标空间分解整体 root 轨迹／pelvis 自然残差，DAG 固化 gait Pose、Lean／Acceleration／Look 的原点依赖，归一 IK 辅助根，并对最终 raw 重烘焙／回读 FBX。183 个非道具身份处理、70 个道具身份保留；最终候选 `als_nonprop_20261008_root_ownership_v5` 的 113 项 Python、88 个原生 FBX、导入／六域请求、根开关及 1509 文件哈希通过。真实五方向原版／候选 6000 帧和 380 张截图身份一致，前向 pelvis-root 峰值降至 5.92 cm、起步单帧 0.59 cm；前／左前足底对照通过，后／纯左／纯右仍失败，整体移动验收失败，默认 v8 未改。下一步修后退／侧移母动作的支撑与方向，重出闭包后完成完整 71 项矩阵；Distance Matching 播放控制仍开放。见 [最终证据与截图](docs/verification/2026-10-08-kimodo-planar-root-ownership.md)和[稳定设计](docs/architecture/kimodo-planar-root-ownership.md)。
+
+2026-10-08 Kimodo 导出 Pipeline 可视化：Motion Viewer 单栏/A-B/多阶段统一固定源原点、cm 与联动正交相机，分别显示 root/pelvis 轨迹及绝对水平距离；最终栏读取活动包。真实浏览器同原点首帧显示 v8 Walk 偏移 148.6 cm、原版 3.5 cm；相机与时间联动及四项回归通过。仅工具观察契约改进，旧中间产物与活动 DAG provenance、支撑相位对齐仍开放，未认证资产质量。见 [本批证据](docs/verification/2026-10-08-kimodo-viewer-origin-comparison.md)。
+
+2026-10-08 周期修复／回灌继续实现：前进 Walk 的 G 候选通过四相位脚底滑移对照（原版／候选 8 进程、4800 帧、91 张严格匹配截图），且起步 pelvis-root 水平偏移峰值约 6.3 cm；当前激活 v8 在输入后第 34 帧已偏移 54.9 cm、第 55 帧达 2.48 m，root motion 关闭，确认是 pelvis/Hips 动画轨迹异常。G 尚未激活。v8 与 G 稳态胶囊速度均为 1.75 m/s，来自 `walkForwardSpeed=1.75`，前向物理速度未调整。当前 v8 前向测试仍失败（541 个身体脱离帧）；后退／纯侧移、Run／Crouch 新母动作和完整 71 项未通过。下一步保留起步骨盆门禁，按原版侧移语义修正方向并完成全量验收；速度目标仍需单独确认。见 [本批实现与证据](docs/verification/2026-10-08-periodic-repair-feedback.md) 和 [前向速度与起步位移复核](docs/verification/2026-10-08-forward-walk-speed-audit.md)。
+
+2026-10-08 离线修复／回灌方案：已核查 Kimodo MotionCorrection、Blender Mocap Tools／NoSlide 源码，新增原生离线修复入口、四／六路接触适配和周期边界邻域条件。真实 Walk 重修后足部代理滑移略降，但接缝变差仍拒绝；未回灌生成、未实现／验证 Blender 后端、未激活新包。后续以显式接触计划与周期联合修复产生合格参考，再做 A/B/C/D 对照。见 [方案与实测边界](docs/architecture/kimodo-repair-and-regenerate.md)。
+
+2026-10-08 Kimodo 前进步态闭环试验：已实现数值脚锚／周期条件、事件选周期作者门禁、目标 ALS 协议与起停截图检查，实际生成三条 5 秒候选，但 **0/3 母动作通过**（Walk 仅一个合格周期，Run／Crouch 仍有滑移或接缝）。实际 DAG 均拒绝下游，未重定向／发布新包，默认仍 v8。78 项 Python 检查、原版 12 场景／7200 帧通过；原版／旧 v11 的 76 张截图身份一致，旧 v11 被质量检查拒绝。此前首帧负高度属于生产已隐藏的冷姿态，已修观察契约且保留 −2 cm 可见帧标准。下一步针对失败帧继续修支撑与连续性，完整 71 项及新包验收仍开放。见 [本批闭环结果](docs/verification/2026-10-08-kimodo-gait-closure.md)。
+
+2026-10-08 Kimodo 约束与验收方案：已对照实际接口和 DAG，明确支撑事件、完整周期、固定采样帧、镜像相位及两类轨迹文件的分阶段合同。优先把文字 requires 升级为阻断依赖生产的检查节点，再完成前进 Walk／Run／Crouch 小闭环并扩展方向；本批为设计，新增节点、生成 A/B 和运行验收尚未执行。见 [数值生成约束与检查方案](docs/architecture/kimodo-als-locomotion-constraints-and-gates.md)。
+
+2026-10-08 原版 ALS 源码／资产核对：确认普通胶囊移动与原地步态配合、Refactored Stop 固定 Walk 支撑帧，以及 V4／Refactored 各自的脚锁历史规则。生成 v11 的左右同步相位仍偏离原版交替关系；进一步确认 v8／v11 的生成 FootPlanted 符号相反、幅度缩为 ±0.5，按原停止规则会选择错误侧，单靠该循环曲线达不到右脚全锁阈值。后续先修支撑编码，再对 master 验收实际支撑、标记、曲线和停止采样帧；本批仅分析，未改变运行资产或发布状态。见 [原版机制与资产契约](docs/verification/2026-10-08-als-original-locomotion-analysis.md)。
+
+2026-10-08 用户松键／左前截图诊断：当前默认 v8 的骨盆偏移经混合达约 4.5 m，松键回 idle 后远处脚锁锚点造成腿部折叠；八个根关闭进程的 4800 帧未提取／消费根运动，平面胶囊位移与速度积分一致。已补普通相机／地形的全阶段逐帧诊断、准确截图身份检查及包／根开关 HUD，生产矩阵扩为 71 项。v11 新增四项局部 2/4：两项渲染 36 张对应截图通过，两项平面首帧约 3 cm 穿地失败；此前 24/28 段滑步也仍未通过，完整 71 项未执行，默认仍为有缺陷的 v8。下一步先修步态／支撑和初始化接触，再沿 DAG 重出并通过全矩阵后发布。详见 [移动与松键诊断](docs/verification/2026-10-08-als-movement-release-diagnosis.md)。
+
+2026-10-07 非道具 ALS 四方向专项：真实普通输入覆盖七类移动模式各前后左右，共 28 段／三进程／112 张四方向截图（全轮 210 张）。已修复循环裁剪残留原点、冲刺起步行进轨迹及根运动关闭误关自动落地玩法；生成 v11 候选并沿依赖重出 84 个原生输出。67/67 运行场景及三帧率并行一致性通过，但原版同条件足底对照仍有 24/28 段严重滑步回归，E2E 总结果失败，尚不能验收正常移动。完整矩阵和足部质量发布门禁已固化，真实激活调用已因质量失败拒绝。v11 仅接入测试，默认 v8 指针保留，不代表旧包复验合格。下一步先修 master 完整步态周期、交替支撑／步幅，再重出镜像与依赖基底。详见 [四方向 E2E 与截图](docs/verification/2026-10-07-als-nonprop-directional-e2e.md)。
+
+2026-10-07 ALS 根运动配置与生产曲线：普通 ALS 的 `als_animation_settings.json` 默认 `enableRootMotion=false`，关闭时不采样动画 root 或提取 Montage 根运动；行走/平台翻越保留物理输入和程序化目标。`publish stage` 已固化每个含根运动资产的独立曲线烘焙，活动 v8 补齐 34 份曲线；全新 stage 与补烘焙结果逐字一致，815 payload/245 原依据哈希通过。30 项 Python、50 项 Core、优化构建及真实开/关翻滚、四种翻越、1700 帧站蹲/移动、13 Overlay 派发通过。Import 相关过滤 120 项中 5 项仍因已有原包摘要失败，未削弱断言。Distance Matching 仅备数据，运行控制、接触峰值与动作人工验收仍开放。见 [开关与曲线契约](docs/architecture/als-root-motion-policy.md) 和 [本批验证边界](docs/verification/2026-10-07-als-root-motion-policy-and-distance-curves.md)。
+
+2026-10-07 Kimodo 非道具替换：按用户范围已生成、原生重定向并激活 183 个非道具动画身份（V4 88 / Refactored 95），70 个武器/道具身份逐字保留；默认包指针选择 `als_nonprop_20261007_v8`。风格上身按共同基底派生，修正蹲姿站起、Pose 末端填充、翻越平台参考及发布摘要/事件一致性。27 项管线回归与优化构建通过；真实 Godot 导入、六域请求、idle、1700 帧站蹲/移动、13 Overlay 并行派发、低/高翻越通过。idle 上臂最大单帧变化约 0.139°/0.126°；接触矩阵仍有较大漂移峰值，完整动作观感/滑步和地形人工验收保持开放。Import 相关 917 项仍有原包摘要失败 1 项，未放宽断言。完整含道具图的握点/Pose/Bow 输入不在本次替换范围。见 [生产脚本](tools/kimodo_pipeline/README.md) 与 [本批证据和边界](docs/verification/2026-10-07-kimodo-non-prop-replacement.md)。
+
+2026-10-07 Kimodo 完整 ALS 新资源规格：253 个动画引用身份、27 类作用及逐资产生成/派生约束作为稳定设计与完整含道具清单保留；非道具子集的执行/激活状态以上条为准。见 [生产设计](docs/architecture/kimodo-als-resource-production.md)、[逐资产清单](docs/architecture/kimodo-als-asset-catalog.md) 和 [规格阶段分析](docs/verification/2026-10-07-kimodo-generation-contract-analysis.md)。
+
+2026-10-07 Kimodo idle 专项诊断：真实普通 Demo 8 轮 ×360 帧隔离出 SecondaryMotion 循环突变，以及 Overlay/Aim 与基础姿态语义不一致的固定偏差；只恢复 SecondaryMotion 可消除大幅单帧跳变，恢复 Overlay/Aim 及共享依赖后测量骨骼回到原 raw 对照。116 raw/126 FBX 哈希和当前时序均匹配，不能据此宣称视觉正确。本批保留生产资产，仅添加诊断入口；正式语义资产修复与人工验收仍开放。见 [idle 诊断](docs/verification/2026-10-07-kimodo-idle-diagnosis.md)。
+
+2026-10-07 Kimodo 替换资产修复：用户目验 Kimodo 树 als_demo 表现与骨骼本体差距明显，两大嫌疑判定为 BVH 轴错排除（P1 肘 0.00°/肩 <1.1°）、Stage3 Manny→ALS 重定向确认（曲线级 mean≈绑定姿态差且 std≈0 的 FK 直传签名）。修复为 create_als_ikrig.py 复刻 Mocara AutoAlignLimbsOnly（ResetRetargetPose + 四肢 32 骨 ChainToChain 对齐、躯干 identity），二段重出 123/123，探针复验 arm drop s2≡s1、P3 肩 0.93°。Godot 侧树重组 + 六域导出 + Option C 时序回退重跑（116 raw/70 重采样全过），并确认编译 digest 不含 FBX 字节哈希、门 pin afcd3d54 与旧 requests 均依然有效无需重钉；P2B/asset smoke/rig harness 复验全绿。见 [Stage3 姿态对齐修复](docs/verification/2026-10-07-kimodo-stage3-retarget-pose-fix.md)。
+
 2026-10-05：默认 Demo 已接同一世界内的 ALS／Lyra 主控切换，F6 或顶部按钮选择，启动参数只决定初始模式。交接世界位置／速度／蹲伏与视角，动作期间延后，保留装备／Overlay 与原场景平台。验证范围见 [运行时切换](docs/verification/2026-10-05-demo-locomotion-switch.md)，其余动画、物理及人工验收范围仍按本路线推进。
+
+2026-10-05 ALS 优先级首批：原共享 Source Sync 的真实通知已进入现有角色队列，普通生产路径停止旧移动状态机 tick；Refactored Layering 已默认接入，V4 Overlay/Aim/脊柱/手部仍在显式边界后复用。增加最终蒙皮足部质量测量及 13 Overlay／移动平台多角色回归。本批不是完整上身、全部通知效果或新 UE 整链验收；音频、道具物理、头颈专项继续暂缓。见 [实现与验证](docs/verification/2026-10-05-als-notify-layering-production.md)。
 
 本节按用户最新要求定义当前验收，优先于后面的历史原生逐项还原口径：迁移 Lyra 的 locomotion 思路和运动核心算法，不要求完整复刻 UE 的全部内部行为。武器覆盖 **手枪和步枪**；Unarmed 保留为基础与切换回退。URO 等 UE 原生优化进入后续路线，Shotgun/Feminine 等额外 Provider 不作为当前交付门槛。
 
@@ -335,8 +379,8 @@
 |---|---|---|
 | R1 Standing 严格对齐 | 已关闭本批门禁：三频率 2310 帧/140067 骨骼求值全部通过；Parent 已比较字段和时钟差 0 | 保持既定阈值作为后续角色整合的回归；不代表完整角色或普通 Demo 验收 |
 | R2 角色级动作与 Transition Slot | Standing/Crouching/Grounded/Locomotion 已共享角色事务；真实 Transition 输出、惯性请求接收、落地停止/播放已接 Demo。桥外旧 Overlay/动作 bank 仍保留 | 扩展完整角色资源，完成整链原生对照 |
-| R3 完整主移动图 | 原移动姿态、Parent、Rest反馈、Moving/MovingSmooth、方向记忆、动画加速度历史、平台身份及组件惯性已接 Demo。源 Notify、完整原生输入时序对照仍待 | 移除兼容更新，补完整生产反馈和 Crouching/Grounded/Locomotion 连续原生轨迹 |
-| R4 上身、Overlay 与最终脚部 | 13 Overlay 等已有受控组件证据；不能代替新全角色连续证据 | Aim/Layering/手部/脚部按原图拓扑接入，换向与支撑窗口、地形/平台通过 |
+| R3 完整主移动图 | 原移动姿态、Parent 和反馈已接 Demo；真实 Source Notify 已进入角色队列，生产路径已去旧移动 tick。原生整链、桥外动作 bank 通知与完整效果消费仍待 | 完整角色通知及 Crouching/Grounded/Locomotion 连续原生轨迹 |
+| R4 上身、Overlay 与最终脚部 | 原 Layering 默认接生产；13 个 V4 Overlay 与现有 Aim/脊柱/手部仍通过显式边界复用。已有最终蒙皮测量和平台多角色证据，膝角变化仍需分解 | 原生 Overlay/Aim/手部组合、地形矩阵与完整连续对照；保留暂缓专项 |
 | R5 Godot 普通入口 | 首批接入完成：普通入口默认新 stance/Transition；现有 Gather/Worker/Commit 统一发布，30/60/120 Hz 与键鼠/多帧测试通过；完整图与人工验收未关闭 | 延续新入口完成剩余子图，并补完整功能矩阵、人工和性能验收 |
 | R6 通用动作与物理恢复 | Mantle 已接普通新移动链：低/高台、空中抓边、平台跟随、取消和目标销毁恢复；Roll/Ragdoll/Get-up/Camera 接线保留，长期物理稳定性尚有失败 | 扩展人工/地形/Overlay 矩阵，并完成其余动作及长期物理门禁 |
 | R7 最终交付 | 十分钟预算、完整人工矩阵及可复现交付未完成 | 原性能目标与所有功能门禁通过，生成资产交付可复现 |
@@ -373,20 +417,23 @@ R1 证据见 [Standing 曲线精度修正](docs/verification/2026-09-26-standing
 - [x] 真实脚部反馈 → Rest DynamicTransitions：上一最终 IK 目标经本帧组件变换，与本帧 global 足锁结果一起传入原图；保持原门控、8 cm×scale、左右选择和两帧间隔，实际进入共享 Transition 动作队列。身份、隐藏全局帧、晚期取消／重试及普通角色扰动测试见 [足部反馈验证](docs/verification/2026-09-26-refactored-rest-feet.md)。这不是新完整足部／角色 UE oracle，项目接触修正仍须单独验收。
 - [x] 原方向状态机生成的 `ActivatePivot` 通知已接 Standing PostUpdate → Parent → 下一帧 Movement Details，普通 Demo 真实输入覆盖 First/Second Pivot。原门槛严格 speed<200 cm/s；不在 worker 回调中提前执行，不对生成通知套源动画 weight/follower/chance 过滤。Standing 机器权重改为实际上一更新记录，初值及隐藏提交为0，取消不发布。独立/共享三频率新连续 UE 对照通过，见 [Pivot 验证](docs/verification/2026-09-26-refactored-pivot-notify.md)。
 - [ ] 将其余源 Notify/Notify State 与生成状态通知接到通用队列及类型化消费者。保留存在性、事件顺序、持续区间、停用/销毁结束语义，只有成功提交才派发副作用。**纠正此前描述：Pivot 的直接来源是方向图的生成过渡通知，不是动画序列上的普通源 Notify；不能为了接 Pivot 人工添加源通知。**
-- [x] 原 catalog 的 136 个 Sequence/Montage、177 条源通知已完整只读导出，并编译原对象身份、全精度触发偏移、过滤策略和六类载荷。真实 source tick 接口保留 owner/player/sample/epoch、Sync 更新顺序与最高权重样本；三频率取消重试及原 Roll 状态生命周期验证见 [通知资源与提取边界](docs/verification/2026-09-26-refactored-source-notifies.md)。**这是资源与组件，尚未汇入 Demo 的角色级队列，不能据此勾选上一项或移除旧兼容时钟。**
+- [x] 真实共享 Source Sync 通知接普通 Demo 角色队列：与现有物理 Montage、Overlay/Ragdoll 源共用队列合并、状态生命周期及提交派发；保留源顺序、follower/weight/chance/LOD/ScopeFiltered、epoch 和完整载荷查询。生产路径不再执行旧移动状态机；旧类保留给诊断/legacy 入口，Overlay/Ragdoll 的既有 bank 仍保留。见 [首批生产验证](docs/verification/2026-10-05-als-notify-layering-production.md)。**桥外 Refactored 动态动作 bank 的源通知、完整原生通知 oracle、音频/特效及 RootScale 等全部效果消费仍不能据此关闭。**
+- [x] 原 catalog 的 136 个 Sequence/Montage、177 条源通知已完整只读导出，并编译原对象身份、全精度触发偏移、过滤策略和六类载荷。资源和提取边界见 [通知资源与提取边界](docs/verification/2026-09-26-refactored-source-notifies.md)；普通共享 source 的生产接入已完成上述子项，不等于完整角色的所有通知关闭。
 
 交付：同一角色输入驱动的完整 locomotion 输出（姿态、曲线、播放观察、事件、根运动候选）；站蹲、跳跑、落地和换向连续 UE 对照。
 
 同步前置项已接生产：本机 UE 的 linked graph 共用外层 Sync 范围；当前 Standing/Crouching 的同名 Movement 已共同选主和推进。六类 source 在实际节点处登记，保留 deferred cache 前直接源的访问顺序；一个物理 bank 持有时钟／过滤／epoch／样本和姿态，局部视图不再独立 tick。统一 Sync 后捕获 Details/Rotate/Grounded/Air 时钟，隐藏帧与取消重试纳入角色事务，普通 Demo 通过原 runtime 工厂默认接入。见 [共享组件](docs/verification/2026-09-26-refactored-source-scope.md) 和 [生产接入验证](docs/verification/2026-09-26-refactored-source-hosts.md)。这关闭本项接入缺口，不代表新整图连续 UE 对照或完整 Notify 迁移完成。
 
-下一接入顺序：使用已接生产的共享 Source Sync 汇总真实 Notify，与 Montage 共用角色级队列／消费者，再移除旧移动更新兼容依赖。以真实Character输入/方向/加速度历史补 Crouching/Grounded/Locomotion 与 Parent 连续 UE oracle，随后推进原生上身分层。Pivot、Rest足部反馈、MovingSmooth、方向/速度历史、平台身份及组件变换均已接生产输入；旧外层惯性和通知兼容仍保留，不能称完整移植验收。
+下一接入顺序：补桥外动态动作 bank 的真实通知、完整效果消费者与原生通知 oracle；以真实 Character 输入补 Crouching/Grounded/Locomotion 与 Parent 连续 UE 对照，并推进原 Overlay/Aim/手部组合。共享 source 的角色队列与生产旧移动 tick 移除已完成，旧外层惯性和 V4 上身边界仍保留，不能称完整移植验收。
 
 ### R4：接上半身、Overlay 与完整最终姿态
 
 - [ ] 按原图拓扑连接 13 个 Overlay、动作分支、AimOffset、局部/网格空间加法、Layering、脊柱和手部约束。重新核实原有组件的受控输入，在完整角色中提供真实曲线和源姿态。
+- [x] Refactored Layering 原拓扑接普通生产帧：原固定帧零站蹲基底、局部/网格加法与曲线尾部；V4 Overlay 源在显式坐标/虚拟骨/曲线边界转换。已验证 13 Overlay、站蹲/起停/转向/瞄准、移动平台 single/parallel；**仍复用 V4 Overlay、Aim/脊柱/手部，区域 Slot 暂无生产 Montage 注册，完整上身子项保持开放。**见 [生产验证](docs/verification/2026-10-05-als-notify-layering-production.md)。
 - [ ] 绑定 Overlay 装备/切换/收起、道具挂点及弓曲线；普通持物参与验收，道具物理暂缓。最终姿态与 attachment 必须来自同一已提交角色帧。
 - [ ] 接入 Foot IK、Foot Lock、pelvis correction 和平台数据：主线程采集碰撞/平台快照，worker 只读使用；锁脚、释放、接触锚点及上一帧状态一起回滚。保留原生等价与项目几何修正的区别。
 - [ ] 覆盖左右横移换向、不同支撑脚相位的换髋延迟、起停滑步、冲刺/跳跃切换、坡地/台阶/移动平台及上下身组合。支撑滑移在真实接触窗口测量，不用单张截图或脚低位代理代替验收。
+- [x] 建立独立最终蒙皮测量：完整 foot/toe 支撑顶点穿透、固定足底样本质心滑移/锚点漂移及最终膝角差；使用支撑表面局部坐标、帧连续性和接触/完全锁脚窗口，带峰值帧定位。当前三频率 Demo 与平台回归不代替所有地形验收；膝角单帧变化仍需基线分解，不因新增测量就关闭足部质量目标。
 
 交付：完整最终骨骼、曲线及道具姿态；逐阶段 UE 对照和多帧画面证据。头颈拉长仍登记为暂缓缺陷，若影响最终稳定性，必须修复或明确记录交付限制，不能静默关闭。
 

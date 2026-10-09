@@ -26,12 +26,12 @@ internal sealed class AlsRawAnimationSourceSampler
         if (animation.StableId != data.Identity.AssetId || animation.ObjectPath != data.Identity.AssetPath)
             throw new ArgumentException("Raw source sampler asset identity differs from its manifest.");
         _skeleton = skeleton; Definition = source;
-        _withRetargetReference = new(data, skeleton.LogicalParents, skeleton.ReferencePose, skeleton.VirtualBones);
+        _withRetargetReference = new(data, skeleton.LogicalParents, skeleton.ReferencePose, skeleton.VirtualBones, AlsAnimationRuntimeOptions.SampleRootMotion);
         var authoredReference = skeleton.ReferencePose.ToArray();
         // UE's retarget-disabled extraction starts from the authored source reference;
         // stale/missing virtual entries fall back to the actual target skeleton reference.
         policy.RetargetTransforms.CopyTo(authoredReference.AsSpan(0, policy.RetargetTransforms.Length));
-        _withoutRetargetReference = new(data, skeleton.LogicalParents, authoredReference, skeleton.VirtualBones);
+        _withoutRetargetReference = new(data, skeleton.LogicalParents, authoredReference, skeleton.VirtualBones, AlsAnimationRuntimeOptions.SampleRootMotion);
         _retarget = new(skeleton.LogicalToPhysical, skeleton.TranslationRetargetModes.ToArray().Select(m => (int)m).ToArray(),
             data.LogicalTrackPresence, skeleton.PreciseReferencePose, policy.PreciseRetargetTransforms,100);
         var curves = animation.Curves.Where(c => c.Provenance == AlsCurveProvenance.SourceCurve).ToArray();
@@ -61,6 +61,7 @@ internal sealed class AlsRawAnimationSourceSampler
         var policy = Definition.Policy;
         pose[0] = AlsRawRootLock.Apply(pose[0], _skeleton.ReferencePose[0], policy.RootLockFirstFrame,
             (int)policy.RootMotionRootLock, policy.EnableRootMotion, policy.ForceRootLock, extractRootMotion, ignoreRootLock);
+        if (!AlsAnimationRuntimeOptions.SampleRootMotion) pose[0] = _skeleton.ReferencePose[0];
         curves.Clear();
         for (var index = 0; index < curves.Length; index++)
             if (_curveIds[index] >= 0)

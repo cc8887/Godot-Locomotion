@@ -111,15 +111,15 @@ internal sealed class AlsStandingCycleGraph
             !graphBinding.StandingSamples.SequenceEqual(profile.StandingSamples.Select(s => new AlsP5GraphSample(s.AnimationId, s.X, s.Y, s.RateScale)).ToArray()))
             throw new InvalidOperationException("Cycle graph and P5 source snapshot disagree.");
         _sourceSnapshot = sourceBindings;
-        DirectionCacheProfile = AlsStandingDirectionCacheCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_locomotion_source_graph.json"),
-            Godot.FileAccess.GetFileAsString("res://assets/config/v4_pose_cache_graph.json"));
-        _yawOffsets = AlsYawOffsetCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_yaw_inputs.json"));
+        DirectionCacheProfile = AlsStandingDirectionCacheCompiler.Compile(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_source_graph.json"),
+            Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_pose_cache_graph.json"));
+        _yawOffsets = AlsYawOffsetCompiler.Compile(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_yaw_inputs.json"));
         _sprintProfile = sourceBindings.StandingSprint;
         _movementSettings = AlsLocomotionInputCompiler.Compile(Godot.FileAccess.GetFileAsString(
-            "res://assets/config/v4_locomotion_inputs.json")).Movement;
+            GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_inputs.json")).Movement;
         _directionFeedback = AlsDirectionFeedbackCompiler.Compile(Godot.FileAccess.GetFileAsString(
-            "res://assets/config/v4_locomotion_inputs.json"), Godot.FileAccess.GetFileAsString(
-            "res://assets/config/v4_locomotion_source_graph.json")).Runtime;
+            GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_inputs.json"), Godot.FileAccess.GetFileAsString(
+            GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_source_graph.json")).Runtime;
         _ids = new int[26];
         _ids[0] = profile.StandingIdleAnimationId;
         for (var direction = 0; direction < 6; direction++)
@@ -135,13 +135,13 @@ internal sealed class AlsStandingCycleGraph
         _lengths = _ids.Select(id => set.Animations[id].PlayLength).ToArray();
         _curveIds = _ids.Select(id => set.Animations[id].Curves.Where(c => c.Provenance == AlsCurveProvenance.SourceCurve)
             .ToDictionary(c => c.SourceName, c => c.CurveId, StringComparer.OrdinalIgnoreCase)).ToArray();
-        using var document = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_locomotion_curves.json"));
+        using var document = JsonDocument.Parse(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_curves.json"));
         var curves = document.RootElement.GetProperty("curves").EnumerateArray().ToDictionary(c => c.GetProperty("name").GetString()!);
         _walkStride = ReadCurve(curves["StrideBlend_N_Walk"]);
         _runStride = ReadCurve(curves["StrideBlend_N_Run"]);
         _changeDirection = ReadCurve(curves["ChangeDirection"]);
         _sampleTransitionCurve = progress => Sample(_changeDirection, progress);
-        using var directionSettings = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_direction_state_machine.json"));
+        using var directionSettings = JsonDocument.Parse(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_direction_state_machine.json"));
         var machine = directionSettings.RootElement;
         if (machine.GetProperty("schemaVersion").GetInt32() != 1 ||
             !machine.GetProperty("sourceGraph").GetString()!.EndsWith(":(N) CycleBlending.AnimGraphNode_StateMachine_1.(N) Directional States", StringComparison.Ordinal) ||
@@ -150,7 +150,7 @@ internal sealed class AlsStandingCycleGraph
         _maxTransitionsPerFrame = machine.GetProperty("maxTransitionsPerFrame").GetInt32();
         _skipFirstUpdateTransition = machine.GetProperty("skipFirstUpdateTransition").GetBoolean();
         if (_maxTransitionsPerFrame is < 1 or > 32) throw new InvalidOperationException("Invalid direction transition limit.");
-        using var sampling = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_walkrun_sampling.json"));
+        using var sampling = JsonDocument.Parse(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_walkrun_sampling.json"));
         if (sampling.RootElement.GetProperty("schemaVersion").GetInt32() != 1)
             throw new InvalidOperationException("Unsupported WalkRun sampling schema.");
         var spaces = sampling.RootElement.GetProperty("assets");

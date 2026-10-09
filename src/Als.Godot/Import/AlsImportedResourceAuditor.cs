@@ -76,7 +76,7 @@ public static class AlsImportedResourceAuditor
     }
 
     public static string ToResourcePath(string relativePath) =>
-        $"res://assets/generated/als_v4/{relativePath.Replace('\\', '/')}";
+        $"{AlsGodotImportCoordinator.AssetRoot}/{relativePath.Replace('\\', '/')}";
 
     public static string ComputeTargetRestPoseHash(
         Skeleton3D skeleton,

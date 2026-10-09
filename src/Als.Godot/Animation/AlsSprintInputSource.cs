@@ -21,7 +21,7 @@ internal sealed class AlsSprintInputSource : IDisposable
 
     public AlsSprintInputSource(AlsAnimationLibraryBuildResult library,AlsAnimationSetDefinition set,AlsLocomotionSourceProfile sources)
     {
-        _profile=AlsSprintInputCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_locomotion_source_graph.json"),sources,set);
+        _profile=AlsSprintInputCompiler.Compile(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_source_graph.json"),sources,set);
         var all=sources.Players;var samples=sources.Samples;
         _players=[all[_profile.FirstPlayerId],all[_profile.ImpulsePlayerId]];
         _samples=[samples[_players[0].SampleStart],samples[_players[1].SampleStart]];

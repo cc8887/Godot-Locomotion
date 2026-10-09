@@ -10,15 +10,17 @@ public sealed class AlsPreciseRawSequenceSampler
     private readonly AlsPrecisePose[] _reference, _first, _second, _components;
     private int _sampling;
     private readonly AlsRawFrameTimeRounding _rounding;
+    private readonly bool _sampleRootMotion;
 
     public AlsPreciseRawSequenceSampler(AlsRawAnimationPoseData data, ReadOnlySpan<int> parents,
         ReadOnlySpan<AlsPrecisePose> reference, ReadOnlySpan<AlsLogicalVirtualBone> virtualBones,
-        AlsRawFrameTimeRounding rounding = AlsRawFrameTimeRounding.OptimizedCancellation)
+        AlsRawFrameTimeRounding rounding = AlsRawFrameTimeRounding.OptimizedCancellation, bool sampleRootMotion = true)
     {
         ArgumentNullException.ThrowIfNull(data);
         if (rounding is not (AlsRawFrameTimeRounding.OptimizedCancellation or AlsRawFrameTimeRounding.RoundSubframe))
             throw new ArgumentOutOfRangeException(nameof(rounding));
         _rounding = rounding;
+        _sampleRootMotion = sampleRootMotion;
         if (reference.Length != data.LogicalBoneCount || virtualBones.Length != data.VirtualBoneCount)
             throw new ArgumentException("Precise raw reference layout differs.");
         var single = new AlsLocalPose[reference.Length];
@@ -60,7 +62,7 @@ public sealed class AlsPreciseRawSequenceSampler
         for (var i = 0; i < physical.Length; i++)
         {
             var logical = _data.PhysicalToLogical[i];
-            if (_data.LogicalTrackPresence[logical]) output[logical] = new(physical[i]);
+            if ((_sampleRootMotion || logical != 0) && _data.LogicalTrackPresence[logical]) output[logical] = new(physical[i]);
         }
         for (var i = 0; i < _virtualBones.Length; i++)
             if (_data.VirtualTrackPresence[i]) output[_virtualBones[i].Bone] = new(explicitVirtual[i]);

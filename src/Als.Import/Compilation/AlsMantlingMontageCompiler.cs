@@ -44,9 +44,9 @@ public sealed class AlsMantlingMontageProfile
 /// montage clock and slot evaluator. Branching-point callbacks are deliberately not queued here.</summary>
 public static class AlsMantlingMontageCompiler
 {
-    public static AlsMantlingMontageProfile Compile(string animationJson,string rootJson,string curveJson)
+    public static AlsMantlingMontageProfile Compile(string animationJson,string rootJson,string curveJson,bool sampleRootMotion=true)
     {
-        var poses=AlsMantlingPoseCompiler.Compile(animationJson,rootJson);
+        var poses=AlsMantlingPoseCompiler.Compile(animationJson,rootJson).ToDictionary(p=>p.Key,p=>p.Value.WithRootMotionSampling(sampleRootMotion));
         var curves=AlsMantlingCurveCompiler.Compile(curveJson,animationJson);
         using var document=JsonDocument.Parse(animationJson);var root=document.RootElement;
         var skeleton=root.GetProperty("skeletons").EnumerateObject().Single().Value;

@@ -214,6 +214,7 @@ public partial class P4LocomotionDemo : Node3D
             var animationSetResource = ResourceLoader.Load<AlsAnimationSetResource>(
                 AlsGodotImportCoordinator.CompiledResourcePath)
                 ?? throw new InvalidOperationException("P4 demo animation set resource is missing.");
+            if (AlsKimodoSourceGate.IsEnabled()) AlsKimodoSourceGate.VerifyRuntimeResource();
             var animationSet = animationSetResource.LoadDefinition();
             var profile = AlsLocomotionProfileCompiler.Compile(
                 Godot.FileAccess.GetFileAsString(ProfilePath), animationSet);

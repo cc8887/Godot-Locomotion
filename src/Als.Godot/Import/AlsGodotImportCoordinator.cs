@@ -17,9 +17,19 @@ public sealed record AlsGodotImportReport(
 
 public static class AlsGodotImportCoordinator
 {
-    public const string AssetRoot = "res://assets/generated/als_v4";
-    public const string ManifestPath = AssetRoot + "/als_manifest.json";
-    public const string CompiledResourcePath = AssetRoot + "/compiled/als_animation_set.tres";
+    public static readonly string AssetRoot = ResolveAssetRoot();
+    public static readonly string ManifestPath = AssetRoot + "/als_manifest.json";
+    public static readonly string CompiledResourcePath = AssetRoot + "/compiled/als_animation_set.tres";
+
+    // A validated active pack selects both source readers and imported resources.
+    // The explicit asset-root override remains available for isolated diagnostics.
+    private static string ResolveAssetRoot()
+    {
+        var root = System.Environment.GetEnvironmentVariable("ALS_ASSET_ROOT");
+        return string.IsNullOrWhiteSpace(root)
+            ? AlsAnimationResourcePack.AssetRoot ?? "res://assets/generated/als_v4"
+            : root.TrimEnd('/');
+    }
 
     public static AlsGodotImportReport Run()
     {
@@ -28,10 +38,16 @@ public static class AlsGodotImportCoordinator
         var manifest = AlsManifestSerializer.Load(manifestAbsolutePath);
         ThrowIfIssues("Manifest validation", AlsManifestValidator.Validate(manifest));
         GD.Print("P2B_IMPORT_STAGE manifest_validated");
+
+        var kimodoGateEnabled = AlsKimodoSourceGate.IsEnabled();
+        if (kimodoGateEnabled) AlsKimodoSourceGate.VerifyManifest(manifest);
+        if (kimodoGateEnabled) AlsKimodoSourceGate.VerifyFbxPayloads(manifest);
+
         ThrowIfIssues("File audit", AlsFileAuditor.Validate(assetRootAbsolutePath, manifest));
         GD.Print("P2B_IMPORT_STAGE files_audited");
 
         var definition = AlsAnimationSetCompiler.Compile(manifest);
+        if (kimodoGateEnabled) AlsKimodoSourceGate.VerifyCompiledDigest(definition.DefinitionDigest);
         GD.Print("P2B_IMPORT_STAGE definition_compiled");
         var audit = AlsImportedResourceAuditor.Audit(manifest, definition);
         GD.Print("P2B_IMPORT_STAGE resources_audited");

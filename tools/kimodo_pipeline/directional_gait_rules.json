@@ -1,0 +1,233 @@
+{
+  "extends": "non_prop_rules.json",
+  "reuseModel": true,
+  "torchThreads": 2,
+  "locomotionOverrides": {
+    "Walk_Left_Forward": {
+      "prompt": "A person is walking to their left at a steady pace, taking complete alternating forward strides with hips turned left and shoulders facing forward, with relaxed shoulders and arms hanging close to the body, making small forward and backward swings.",
+      "direction": [
+        1,
+        0
+      ],
+      "headingDegrees": 45
+    },
+    "Walk_Left_Backward": {
+      "prompt": "A person is walking to their left at a steady pace, taking complete alternating backward strides with hips turned right and shoulders facing forward, with relaxed shoulders and arms hanging close to the body, making small forward and backward swings.",
+      "direction": [
+        1,
+        0
+      ],
+      "headingDegrees": -45
+    },
+    "Run_Left_Forward": {
+      "prompt": "A person is running sideways to their left at a steady pace with alternating strides, hips angled left and chest facing forward.",
+      "direction": [
+        1,
+        0
+      ],
+      "headingDegrees": 45
+    },
+    "Run_Left_Backward": {
+      "prompt": "A person is running sideways to their left at a steady pace, taking backward strides with hips angled right and chest facing forward.",
+      "direction": [
+        1,
+        0
+      ],
+      "headingDegrees": -45
+    },
+    "Crouch_Walk_Left_Forward": {
+      "prompt": "A person is walking sideways to their left in a low crouch at a steady pace, hips angled left and chest facing forward.",
+      "direction": [
+        1,
+        0
+      ],
+      "headingDegrees": 45
+    },
+    "Crouch_Walk_Left_Backward": {
+      "prompt": "A person is walking sideways to their left in a low crouch at a steady pace, taking backward steps with chest facing forward.",
+      "direction": [
+        1,
+        0
+      ],
+      "headingDegrees": -45
+    },
+    "Sprint_Acceleration": {
+      "prompt": "A person is sprinting forward with powerful alternating strides, a pronounced forward lean and strong coordinated arm swings.",
+      "direction": [
+        0,
+        1
+      ],
+      "headingDegrees": 0,
+      "velocity": 5,
+      "reference": "Run_Forward"
+    },
+    "Walk_Forward": {
+      "prompt": "A person is walking forward at a steady pace, repeating complete alternating strides with coordinated arm swings, with relaxed shoulders and arms hanging close to the body, making small forward and backward swings.",
+      "direction": [
+        0,
+        1
+      ],
+      "headingDegrees": 0
+    }
+  },
+  "gaitClosure": {
+    "Walk_Left_Forward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "discoverySeconds": 5,
+      "repairMirroredCycle": true,
+      "constraintReference": "native_als",
+      "constrainHandOrientations": true,
+      "upperBodyIdleReference": "Idle"
+    },
+    "Walk_Left_Backward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "constraintReference": "native_als",
+      "discoverySeconds": 5,
+      "repairMirroredCycle": true,
+      "constrainHandOrientations": true,
+      "upperBodyIdleReference": "Idle"
+    },
+    "Run_Left_Forward": {
+      "candidateSeconds": 4,
+      "boundaryContextFrames": 1,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "constraintReference": "native_als",
+      "discoverySeconds": 4,
+      "constrainHandOrientations": true,
+      "repairMirroredCycle": true
+    },
+    "Run_Left_Backward": {
+      "candidateSeconds": 4,
+      "boundaryContextFrames": 1,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "constraintReference": "native_als",
+      "discoverySeconds": 4,
+      "constrainHandOrientations": true,
+      "repairMirroredCycle": true
+    },
+    "Crouch_Walk_Left_Forward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "repairReference": true,
+      "repairHarmonics": 3,
+      "discoverySeconds": 5,
+      "repairMirroredCycle": true
+    },
+    "Crouch_Walk_Left_Backward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "constraintReference": "native_als",
+      "discoverySeconds": 5,
+      "repairMirroredCycle": true
+    },
+    "Sprint_Acceleration": {
+      "candidateSeconds": 4,
+      "boundaryContextFrames": 1,
+      "maximumConstraintCycles": 3,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "constraintReference": "native_als",
+      "discoverySeconds": 4,
+      "constrainHandOrientations": true,
+      "repairMirroredCycle": true
+    },
+    "Walk_Forward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1,
+      "candidateCycles": 3,
+      "fullBodyPhaseCycles": 3,
+      "supportAnchorCount": 4,
+      "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3,
+      "maximumAnchorCorrectionMeters": 0.15,
+      "repairAfterGeneration": true,
+      "finalRepairHarmonics": 3,
+      "repairRampFrames": 4,
+      "minimumKneeBendDegrees": 15,
+      "fitRegularization": 0.02,
+      "constraintReference": "native_als",
+      "discoverySeconds": 4,
+      "constrainHandOrientations": true,
+      "repairMirroredCycle": true,
+      "upperBodyIdleReference": "Idle"
+    }
+  },
+  "programmaticGaits": {
+    "Walk_Left_Backward": "Walk_Left_Forward",
+    "Crouch_Walk_Left_Backward": "Crouch_Walk_Left_Forward"
+  }
+}

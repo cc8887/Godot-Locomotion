@@ -41,7 +41,7 @@ public static class AlsMantlingRootMotion
         in AlsMantlingWarpSettings settings, in AlsMantlingWarpAnchors anchors,
         in AlsPrecisePose actor, in AlsQuaternion meshRotation, in AlsDoubleVector gravityUp,
         bool targetExists, bool relative, in AlsPrecisePose targetBase,
-        AlsMontageRootTransformSampler rootSampler)
+        AlsMontageRootTransformSampler rootSampler, bool useRootMotion = true)
     {
         Nonnegative(time);Nonnegative(simulationDelta);Nonnegative(delta);
         var nextTime = time + simulationDelta;
@@ -50,7 +50,7 @@ public static class AlsMantlingRootMotion
         // Native advances its clock even when the source cannot emit motion.
         if (settings.Duration <= 1e-8f || delta <= 1e-8f || !targetExists)
             return new(nextTime,false,0,0,0,0,AlsPrecisePose.Identity,default,AlsQuaternion.Identity);
-        ArgumentNullException.ThrowIfNull(rootSampler);
+        if (useRootMotion) ArgumentNullException.ThrowIfNull(rootSampler);
         Nonnegative(settings.MontageStartTime);Nonnegative(settings.BlendInTime);
         if (!float.IsFinite(settings.MontageRate) || settings.MontageRate <= 0 ||
             !float.IsFinite(settings.WarpStart) || !float.IsFinite(settings.WarpEnd) || settings.WarpEnd <= settings.WarpStart)
@@ -77,7 +77,7 @@ public static class AlsMantlingRootMotion
         var rotation=(start.Rotation*(bias*(1.0-rotationWeight))+target.Rotation*rotationWeight).Normalized();
         var projection=gravityUp*AlsDoubleVector.Dot(gravityUp,new(rotation.X,rotation.Y,rotation.Z));
         rotation=new AlsQuaternion(projection.X,projection.Y,projection.Z,rotation.W).Normalized();
-        var root=Reverse(mesh,UnitScale(rootSampler.Sample(montageTime)));
+        var root=useRootMotion ? Reverse(mesh,UnitScale(rootSampler.Sample(montageTime))) : AlsPrecisePose.Identity;
         var targetActor=AlsPrecisePose.Compose(root,new(position,rotation,AlsDoubleVector.One));
         var velocity=(targetActor.Position-actor.Position)*(1.0/delta);
         var rotationDelta=targetActor.Rotation*actor.Rotation.Conjugate();

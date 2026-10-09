@@ -204,7 +204,7 @@ internal sealed class AlsStandingStateGraph : IAlsStandingCachedGraphSink, IDisp
     public void OnCachedUpdatesSkipped(int handlerNodeIndex, ReadOnlySpan<AlsPoseUpdateContext> skipped) { }
 
     public void Dispose() { _turnSlot.Dispose(); foreach (var clip in _rotationClips) clip.Dispose(); }
-    private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
+    private static string Read(string name) => Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "" + name);
 
     public void ComposeState(int state, in AlsStandingBaseFrame frame, in AlsCycleSyncFrame sources, NVector4 velocity,
         ReadOnlySpan<AlsPrecisePose> idle, ReadOnlySpan<AlsPrecisePose> rest, ReadOnlySpan<AlsPrecisePose> detail, Span<AlsPrecisePose> output)

@@ -20,6 +20,7 @@
 
 # 运行与验证
 
+- 每次请求生成资产默认执行完整 Kimodo pipeline：生成、纯脚本重定向、Root/Pelvis 分解、逐资产曲线、最终 FBX 回读、Godot 导入与相关运行验证；源质量失败仍继续转换已完成的独立资产，保留失败和缺失清单，正式启用遵守既有门禁。仅明确的诊断任务可停在作者阶段。
 - 普通入口为 `scenes/demo/als_demo.tscn`；`p4_locomotion_demo.tscn` 仍供诊断复用。
 - 在主目录验证；Godot 优化构建用 `dotnet build GodotALS.csproj -p:Optimize=true`，大型值类型及零分配 Core/Import 回归用 Release。
 - 按改动范围执行相关测试与必要的真实 Godot 验证，记录失败与覆盖边界；旧阶段证书不自动适用于当前代码。

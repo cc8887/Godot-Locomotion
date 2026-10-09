@@ -32,6 +32,10 @@ header {
   flex: none;
 }
 .brand { font-weight: 600; letter-spacing: 0.3px; white-space: nowrap; }
+#batchSelect { max-width: 220px; min-width: 100px; }
+#stageSelect { max-width: 220px; min-width: 100px; }
+header .btn { white-space: nowrap; flex-shrink: 0; }
+#serverInfo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #errBar {
   background: #5a1d1d;
   color: #ffb0b0;
@@ -227,3 +231,57 @@ table.dataTable { width: 100%; border-collapse: collapse; font: 11.8px/1.5 Conso
 .small { font-size: 11.5px; }
 .kv { display: grid; grid-template-columns: 130px 1fr; gap: 2px 10px; }
 .kv b { color: var(--muted); font-weight: 500; }
+
+/* ---- 链路比对模式 ---- */
+#chainCluster { margin: 10px 10px 6px; display: flex; flex-direction: column; gap: 4px; }
+#chainCluster input {
+  padding: 6px 8px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font: inherit;
+}
+#chainList { list-style: none; margin: 0; padding: 0 0 10px; overflow-y: auto; flex: 1; }
+#chainList .grp { padding: 7px 12px 3px; color: var(--muted); font-size: 11.5px; }
+#chainList li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+#chainList li:hover { background: var(--panel2); }
+#chainList li.sel { background: rgba(61,139,255,0.16); }
+#chainList .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips { display: flex; gap: 3px; flex: none; }
+.chip {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 9.5px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.chip.on { background: var(--c); color: #0b0d10; font-weight: 700; }
+.chip.off { border: 1px dashed var(--border); color: var(--muted); opacity: 0.45; }
+#vpChain {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+#vpChain .vp { min-width: 180px; }
+#vpChain .vp-label { max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#vpChain .vp-badge { max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#chainCluster select { width: 100%; }
+.vp-origin { position: absolute; top: 35px; left: 10px; white-space: pre-line;
+  font: 11px/1.5 monospace; background: #0f1115cc; padding: 4px; pointer-events: none; }
+#serverInfo { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

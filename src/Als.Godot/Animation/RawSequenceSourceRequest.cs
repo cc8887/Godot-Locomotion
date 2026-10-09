@@ -32,16 +32,11 @@ public partial class RawSequenceSourceRequest : Node
             var prop = arguments.Contains("--prop-source");
             if ((aim ? 1 : 0) + (overlay ? 1 : 0) + (stop ? 1 : 0) + (ragdoll ? 1 : 0) + (prop ? 1 : 0) > 1)
                 throw new ArgumentException("Choose one source closure.");
-            var stopProfile = stop ? AlsStopTransitionCompiler.Compile(
-                Godot.FileAccess.GetFileAsString("res://assets/config/v4_overlay_transition_inputs.json"), set,
-                AlsGroundedMachineCompiler.CompileGrounded(Godot.FileAccess.GetFileAsString("res://assets/config/v4_grounded_dependencies.json"))) : null;
-            var overlayProfile = overlay ? AlsOverlaySourceCompiler.Compile(
-                Godot.FileAccess.GetFileAsString("res://assets/config/v4_layering_inputs.json"),
-                Godot.FileAccess.GetFileAsString("res://assets/config/v4_overlay_inputs.json"), set) : null;
-            var aimProfile = aim ? AlsAimSamplingCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/v4_aim_sampling.json"), definition.AimPose, set) : null;
+            var stopProfile = stop ? definition.StopTransitions : null;
+            var overlayProfile = overlay ? definition.OverlaySources : null;
+            var aimProfile = aim ? definition.AimSampling : null;
             var propProfile = prop ? AlsOverlayPropCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/v4_overlay_props_inputs.json"), set,
+                AlsAnimationResourcePack.ConfigRoot + "v4_overlay_props_inputs.json"), set,
                 set.SkeletalMeshes[definition.MannequinMeshId].SkeletonId) : null;
             if (aimProfile is not null) ids = aimProfile.AnimationIds.ToArray();
             if (overlayProfile is not null) ids = overlayProfile.AnimationIds.ToArray();

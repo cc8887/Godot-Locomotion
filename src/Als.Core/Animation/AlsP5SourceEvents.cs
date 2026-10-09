@@ -11,6 +11,11 @@ namespace GodotAls.Core.Animation;
 public readonly record struct AlsP5SourceNotifyTick(int SampleId, long Epoch, float PreviousTime,
     float Delta, float ContextTime, float Weight, bool Leader, bool Loop, bool ActiveContext = true);
 
+// Extracted by another graph's actual Sync owner. Filtering, RNG and lifecycle
+// remain owned by the same character queue as ordinary sources and Montages.
+public readonly record struct AlsAdditionalSourceNotify(AlsAssetNotifyDispatchInput Input,
+    bool Leader, bool DedicatedServer = false, int PredictedLod = 0);
+
 [InlineArray(AlsEventBuffer.Capacity)]
 public struct AlsP5SourceNotifyStates { private AlsAssetNotifyActiveState _element; }
 
@@ -104,7 +109,8 @@ public static partial class AlsP5Runtime
         out AlsP5FailureCode failure, bool dedicatedServer = false, int predictedLod = 0,
         IAlsMontageNotifyBinding? montageBinding = null, ReadOnlySpan<AlsAssetNotifyDispatchInput> montageNotifies = default,
         ReadOnlySpan<AlsAssetNotifyDispatchInput> montageDirectNotifies = default,
-        ReadOnlySpan<long> runtimeFailureEpochs = default)
+        ReadOnlySpan<long> runtimeFailureEpochs = default,
+        ReadOnlySpan<AlsAdditionalSourceNotify> additionalSources = default)
     {
         candidate = default; events = default; failure = AlsP5FailureCode.InvalidBinding;
         if (runtimeFailureEpochs.Length > AlsActionOutcomeBuffer.Capacity) return false;
@@ -124,6 +130,18 @@ public static partial class AlsP5Runtime
             montageBinding is not null && ((uint)montageBinding.SourcePolicyCount > montageBinding.Policies.Length ||
                 !montageBinding.Policies[..montageBinding.SourcePolicyCount].SequenceEqual(bindings.Sources.NotifyPolicies))) return false;
         ReadOnlySpan<AlsAssetNotifyPolicy> policies = montageBinding is null ? bindings.Sources.NotifyPolicies : montageBinding.Policies;
+        if (additionalSources.Length > SourceNotifyReferenceCapacity ||
+            !additionalSources.IsEmpty && montageBinding is null) return false;
+        foreach (var source in additionalSources)
+            if (source.Input.SourceKind != AlsAssetNotifySourceKind.AssetPlayer ||
+                source.Input.PlaybackEpoch < 0 || source.PredictedLod < -1 ||
+                !float.IsFinite(source.Input.EffectiveWeight) || source.Input.EffectiveWeight < 0 ||
+                source.Input.Reference.PolicyIndex < bindings.Sources.NotifyPolicies.Length ||
+                !montageBinding!.TryTimeline(source.Input.Reference, out var timeline) ||
+                timeline.SourceKind != AlsTimelineSourceKind.Animation ||
+                timeline.RequiredOccurrenceHandleId != source.Input.Reference.OccurrenceHandleId ||
+                timeline.DurationSeconds != source.Input.Duration ||
+                !ValidMontageHandle(bindings, source.Input.Reference.OccurrenceHandleId)) return false;
         for (var group = 0; group < 2; group++)
             foreach (var notify in group == 0 ? montageDirectNotifies : montageNotifies)
                 if (montageBinding is null || notify.SourceKind != AlsAssetNotifySourceKind.Montage ||
@@ -137,6 +155,21 @@ public static partial class AlsP5Runtime
         Span<AlsAssetNotifyReference> queue = stackalloc AlsAssetNotifyReference[SourceNotifyReferenceCapacity];
         Span<AlsAssetNotifyReference> queueScratch = stackalloc AlsAssetNotifyReference[SourceNotifyReferenceCapacity];
         var queueCount = 0;
+        // Linked Locomotion is visited before the enclosing Overlay sources.
+        // Do not prefilter this queue in the bridge or draw from a second RNG.
+        Span<AlsAssetNotifyDispatchInput> additionalDispatch = stackalloc AlsAssetNotifyDispatchInput[SourceNotifyReferenceCapacity];
+        var additionalCount = 0;
+        foreach (var source in additionalSources)
+        {
+            incoming[0] = source.Input.Reference;
+            var previous = queueCount;
+            if (!AlsTimelineRuntime.TryQueueAssetNotifies(policies, queue[..queueCount], incoming[..1],
+                new(source.Leader, source.DedicatedServer, source.PredictedLod, source.Input.EffectiveWeight),
+                AlsAssetNotifyQueueMode.Filtered, seed, queueScratch, queue, out queueCount, out seed, out failure)) return false;
+            if (queueCount > previous) additionalDispatch[additionalCount++] = source.Input;
+        }
+        // Preserve their contexts while collecting ordinary source references.
+        queueCount = 0;
         for (var tickIndex = 0; tickIndex < ticks.Length; tickIndex++)
         {
             failure = AlsP5FailureCode.InvalidBinding;
@@ -185,9 +218,10 @@ public static partial class AlsP5Runtime
         // accepted dispatch context instead of indexing the inputs by the merged position.
         Span<AlsAssetNotifyDispatchInput> dispatch = stackalloc AlsAssetNotifyDispatchInput[SourceNotifyReferenceCapacity];
         queueCount = 0;
-        for (var group = 0; group < 3; group++)
+        for (var group = 0; group < 4; group++)
         {
-            ReadOnlySpan<AlsAssetNotifyDispatchInput> inputs = group == 0 ? montageDirectNotifies : group == 1 ? sourceDispatch : montageNotifies;
+            ReadOnlySpan<AlsAssetNotifyDispatchInput> inputs = group == 0 ? montageDirectNotifies :
+                group == 1 ? additionalDispatch[..additionalCount] : group == 2 ? sourceDispatch : montageNotifies;
             foreach (var input in inputs)
             {
                 incoming[0] = input.Reference;
@@ -235,6 +269,8 @@ public static partial class AlsP5Runtime
             var callback = callbacks[i]; var input = callback.State.Input; var reference = input.Reference;
             AlsTimelineEventDefinition definition;
             if (input.SourceKind == AlsAssetNotifySourceKind.Montage)
+            { if (montageBinding is null || !montageBinding.TryTimeline(reference, out definition)) return false; }
+            else if (reference.PolicyIndex >= bindings.Sources.NotifyPolicies.Length)
             { if (montageBinding is null || !montageBinding.TryTimeline(reference, out definition)) return false; }
             else if (!TrySourceTimeline(bindings, reference, out definition)) return false;
             var phase = callback.Kind switch { AlsAssetNotifyCallbackKind.Notify => AlsAnimationEventPhase.Trigger,

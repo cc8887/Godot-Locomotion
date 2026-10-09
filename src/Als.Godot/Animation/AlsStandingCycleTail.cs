@@ -32,9 +32,9 @@ internal sealed class AlsStandingCycleTail : IDisposable
     public AlsStandingCycleTail(AlsAnimationLibraryBuildResult library,AlsAnimationSetDefinition set,int skeleton,
         AlsLocomotionSourceProfile sources)
     {
-        _profile=AlsLeanSamplingCompiler.Compile(Godot.FileAccess.GetFileAsString("res://assets/config/v4_lean_sampling.json"),sources,set,AlsLocomotionSourceDomain.Cycle);
+        _profile=AlsLeanSamplingCompiler.Compile(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_lean_sampling.json"),sources,set,AlsLocomotionSourceDomain.Cycle);
         _player=sources.Players[_profile.PlayerId]; _samples=sources.Samples.ToArray();
-        using var doc=JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/v4_anim_graph_inventory.json"));
+        using var doc=JsonDocument.Parse(Godot.FileAccess.GetFileAsString(GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_anim_graph_inventory.json"));
         var content=_player.SourceNode[.._player.SourceNode.LastIndexOf('.')];
         var nodes=doc.RootElement.GetProperty("graphs").EnumerateArray().Single(g=>Text(g,"path")==content)
             .GetProperty("nodes").EnumerateArray().ToDictionary(n=>Text(n,"name"));

@@ -48,7 +48,7 @@ public partial class AlsCharacterMotor
             }
             var step = AlsMantlingRootMotion.Prepare(state.Frame.Time, delta, delta, state.Settings, state.Anchors,
                 NativeActor(GlobalTransform), MantleMeshRotation, new(0, 0, 1), true, state.Relative,
-                NativeActor(state.Target!.GlobalTransform), state.Motion!.Roots);
+                NativeActor(state.Target!.GlobalTransform), state.Motion!.Roots, AlsAnimationRuntimeOptions.SampleRootMotion);
             // ALS PhysCustom explicitly uses MoveUpdatedComponent(..., false).
             // All clearance tests happened before starting the action.
             var actor = FromNativeActor(step.TargetActor);
@@ -69,12 +69,13 @@ public partial class AlsCharacterMotor
         var motion = _mantleResources!.Motion.Select(target.Type, overlay);
         var montage = _mantleResources.Montages.Definitions[motion.Settings.Montage];
         var pose = _mantleResources.Montages.Poses[montage.SequencePath];
-        var settings = motion.CreateWarpSettings(target.Height, (double)pose.Data.FrameRateNumerator / pose.Data.FrameRateDenominator);
+        var settings = motion.CreateWarpSettings(target.Height, (double)pose.Data.FrameRateNumerator / pose.Data.FrameRateDenominator, AlsAnimationRuntimeOptions.SampleRootMotion);
         var targetBase = NativeActor(target.Body.GlobalTransform);
         var desired = NativeActor(target.World);
         if (target.Relative) desired = AlsPrecisePose.Relative(desired, targetBase);
         var anchors = AlsMantlingRootMotion.CreateAnchors(NativeActor(GlobalTransform), desired, MantleMeshRotation,
-            motion.Roots.Sample(settings.MontageStartTime), motion.Roots.Sample(motion.Settings.MontageLength), target.Relative, targetBase);
+            AlsAnimationRuntimeOptions.SampleRootMotion ? motion.Roots.Sample(settings.MontageStartTime) : AlsPrecisePose.Identity,
+            AlsAnimationRuntimeOptions.SampleRootMotion ? motion.Roots.Sample(motion.Settings.MontageLength) : AlsPrecisePose.Identity, target.Relative, targetBase);
         _mantling = new(new(true, true, false, montage.Asset.ActionDefinitionId, 0, settings.MontageStartTime,
             settings.MontageRate, target.Height, target.Type), target.Body, target.Relative, settings, anchors, motion)
         { Destination = target.Relative ? target.Body.GlobalTransform.AffineInverse() * target.World : target.World, ActorScale = scale };

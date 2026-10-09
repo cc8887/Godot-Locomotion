@@ -38,6 +38,10 @@ internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Iden
     public long RefactoredGroundedFrames { get; init; }
     public int RefactoredGroundedStateMask { get; init; }
     public long RefactoredLocomotionFrames {get;init;}
+    public long RefactoredSourceNotifyReferences {get;init;}
+    public long RefactoredLayeringFrames {get;init;}
+    public long LegacyMovementUpdates {get;init;}
+    public bool UsesRefactoredLocomotion {get;init;}
     public int RefactoredLocomotionStateMask {get;init;}
     public long RefactoredPivotNotifies { get; init; }
     public int RefactoredMovementDetailsMask { get; init; }
@@ -170,7 +174,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     }
     public AlsFrameIdentity Identity => _identity;
     public AlsFullMovementDiagnostics Diagnostics => new(_base.CommittedIdentity, _feedback, _base.CommittedGroundInput,
-        _base.CommittedGlobalInput, _evaluation, _base.Movement.CommittedMovement.CurrentState)
+        _base.CommittedGlobalInput, _evaluation, _base.RefactoredStances?.CommittedLocomotionState ?? _base.Movement.CommittedMovement.CurrentState)
         { RootIdentity = CommittedRootIdentity, RootState = CommittedRoot, Ragdoll = CommittedRagdoll, MovementNotifies = _notifyState,
             OverlayOverride = _overlayOverride,
             RefactoredStandingFrames = _base.RefactoredStances?.CommittedStandingFrames ?? 0,
@@ -188,6 +192,10 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             FootMotion = _layered?.CommittedFootMotion,
             RefactoredMotionHistory = _base.RefactoredStances?.CommittedMotionHistory ?? default,
             RefactoredLocomotionFrames = _base.RefactoredStances?.CommittedLocomotionFrames ?? 0,
+            RefactoredSourceNotifyReferences = _base.CommittedOriginalNotifyReferences,
+            RefactoredLayeringFrames = _layered?.RefactoredLayeringFrames ?? 0,
+            LegacyMovementUpdates = _base.LegacyMovementUpdates,
+            UsesRefactoredLocomotion = _base.RefactoredStances is not null,
             RefactoredLocomotionStateMask = _base.RefactoredStances?.CommittedLocomotionStateMask ?? 0,
             StopTransitions = _base.CommittedStopTransitionCount,
             HasPoseMovingChannel = _poseMoving >= 0, PoseMoving = _committedPoseMoving,

@@ -1,0 +1,13 @@
+{
+  "extends": "gait_closure_rules.json",
+  "gaitClosure": {
+    "Walk_Forward": {
+      "candidateSeconds": 5,
+      "boundaryContextFrames": 1,
+      "targetCleanup": true,
+      "repairReference": true,
+      "selectBestReference": true,
+      "repairHarmonics": 4
+    }
+  }
+}

@@ -43,6 +43,9 @@ public partial class RefactoredFootDispatchSmoke : Node3D
     private bool _done;
     private bool _captureGraph;
     private bool _overlayCycle;
+    private bool _allOverlays;
+    private bool _nonPropOverlays;
+    private int _overlayMask;
     private bool _contactPlatform;
     private bool _contactStatic;
     private bool TestContacts => _contactPlatform || _contactStatic;
@@ -67,6 +70,10 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             Require(AlsP3FrameStages.SplitFeet, "Production split foot flag is required.");
             _captureGraph=OS.GetCmdlineUserArgs().Contains("--production-graph-capture");
             _overlayCycle=OS.GetCmdlineUserArgs().Contains("--overlay-cycle");
+            _allOverlays=OS.GetCmdlineUserArgs().Contains("--all-overlays");
+            _nonPropOverlays=OS.GetCmdlineUserArgs().Contains("--non-prop-overlays");
+            Require(!_nonPropOverlays || _overlayCycle && !_allOverlays,"Select a separate non-prop Overlay cycle.");
+            Require(!_allOverlays||_overlayCycle,"Full Overlay coverage requires its cycle.");
             _contactPlatform=OS.GetCmdlineUserArgs().Contains("--contact-platform");
             _platformMotion=OS.GetCmdlineUserArgs().Contains("--platform-motion");
             Require(!_platformMotion || _contactPlatform, "Platform motion requires a real platform fixture.");
@@ -124,7 +131,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             {
                 var character = new AlsP3Character { Name = "Character" + i, Position = new(i * 5, motor.StandingHeight * .5f, 0) };
                 AddChild(character); _characters.Add(character);
-                character.Configure(_context, new AlsSlotHandle(checked((uint)i), 1), new Commands(_hz, _overlayCycle, i,
+                character.Configure(_context, new AlsSlotHandle(checked((uint)i), 1), new Commands(_hz, _overlayCycle, _allOverlays, _nonPropOverlays, i,
                     _actionRequests ? _context.MovementGraph!.ActionPolicies.Single(p => p.DefinitionId == _context.MovementGraph.RollDefinitionId) : null));
                 character.SetActive(true);
             }
@@ -212,9 +219,11 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                     full.RefactoredRig.Right.Location.ContactApplied && !full.RefactoredRig.RightClearanceCorrected)
                 { _contactFrames++; _contactOwners[i] = true; }
                 Require(full.Overlay == character.LatestMotorInput.Command.RequestedOverlay &&
-                    full.Overlay == Commands.OverlayAt(frame.CommittedFrameId, _hz, _overlayCycle, i),
+                    full.Overlay == Commands.OverlayAt(frame.CommittedFrameId, _hz, _overlayCycle, i, _allOverlays, _nonPropOverlays),
                     "Committed Overlay differs from the captured owner/frame selection.");
                 if (full.Overlay != AlsOverlayKind.Default) _armedFrames++;
+                _overlayMask |= 1 << (int)full.Overlay;
+                if(full.RefactoredLocomotionFrames>0)Require(full.LegacyMovementUpdates==0,"Legacy movement compatibility still ticks.");
                 if(_captureGraph)Require(full.GraphCapture is { } capture && capture.Identity==frame.Identity &&
                     capture.Row.ContainsKey("pose") && capture.Row.ContainsKey("curves"),
                     "Published graph snapshot is incomplete or belongs to another frame.");
@@ -299,6 +308,8 @@ public partial class RefactoredFootDispatchSmoke : Node3D
             Require(!_overlayCycle || _armedFrames > 0 && _characters.All(c => c.FullMovementDiagnostics.Overlay == AlsOverlayKind.Default),
                 "Overlay cycle did not equip and return to Default.");
             if (_overlayCycle) GD.Print($"OVERLAY_DISPATCH_OK armed_frames={_armedFrames} owners={_count} frame_selection_exact=true return_default=true");
+            if(_allOverlays){Require(_overlayMask==(1<<13)-1,"Incomplete original Overlay combinations.");GD.Print($"ALL_OVERLAYS_DISPATCH_OK mask={_overlayMask} owners={_count}");}
+            if(_nonPropOverlays){Require(_overlayMask==(1<<5)-1,"Incomplete non-prop Overlay combinations.");GD.Print($"NON_PROP_OVERLAYS_DISPATCH_OK mask={_overlayMask} owners={_count}");}
             if (_actionRequests)
             {
                 Require(_acceptedActions == _count * 5 && _replacedActions == _count * 2 &&
@@ -376,7 +387,7 @@ public partial class RefactoredFootDispatchSmoke : Node3D
         Require(!character.SplitFootDiagnostics.Pending && !character.Visible, "Deactivation retained a candidate or visible pose.");
         _resumeTick = _tick + 2; _phase = 2;
     }
-    private sealed class Commands(int hz, bool overlayCycle, int owner, AlsMontageActionPolicy? action = null)
+    private sealed class Commands(int hz, bool overlayCycle, bool allOverlays, bool nonPropOverlays, int owner, AlsMontageActionPolicy? action = null)
         : IAlsLocomotionCommandSource, IAlsActionRequestSource
     {
         public AlsActionRequest GetActionRequest(AlsFrameIdentity identity)
@@ -390,11 +401,12 @@ public partial class RefactoredFootDispatchSmoke : Node3D
                     AlsActionCommand.Cancel, policy.DefinitionId, -1, 0, identity.SlotGeneration);
             return AlsActionRequest.None with { SlotGeneration = identity.SlotGeneration };
         }
-        public static AlsOverlayKind OverlayAt(long frame, int hz, bool enabled, int owner) => !enabled || frame < hz || frame >= hz * 5
-            ? AlsOverlayKind.Default : (frame < hz * 3) == (owner % 2 == 0) ? AlsOverlayKind.Rifle : AlsOverlayKind.Pistol2H;
+        public static AlsOverlayKind OverlayAt(long frame, int hz, bool enabled, int owner, bool all=false, bool nonProp=false) => !enabled || frame < hz || frame >= hz * 5
+            ? AlsOverlayKind.Default : nonProp ? (AlsOverlayKind)((frame-hz)*5/(hz*4)) : all ? (AlsOverlayKind)((frame-hz)*13/(hz*4))
+                : (frame < hz * 3) == (owner % 2 == 0) ? AlsOverlayKind.Rifle : AlsOverlayKind.Pistol2H;
         public AlsLocomotionCommand GetCommand(long frame) => AlsLocomotionCommand.CreateDefault() with
         {
-            RequestedOverlay = OverlayAt(frame, hz, overlayCycle, owner),
+            RequestedOverlay = OverlayAt(frame, hz, overlayCycle, owner, allOverlays, nonPropOverlays),
             ViewYaw = overlayCycle ? .7f * MathF.Sin((float)frame / hz) : 0,
             AimYaw = overlayCycle ? .7f * MathF.Sin((float)frame / hz) : 0,
             RequestedRotationMode = overlayCycle ? AlsRotationMode.Aiming : AlsRotationMode.LookingDirection,

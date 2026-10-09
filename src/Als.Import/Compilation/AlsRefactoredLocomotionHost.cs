@@ -50,7 +50,7 @@ public sealed class AlsRefactoredLocomotionHostProfile
         if(parent.Member!="GetParent"||pin.Name!="ReturnValue"||call.Pins.Values.Single(p=>p.Name=="then").Links!=""||
             graph.Nodes.Count(n=>n.Kind!="EdGraphNode_Comment")!=3)throw new ArgumentException("Locomotion action closure differs.");
     }
-    public AlsRefactoredLocomotionHost CreateRuntime(uint character,uint generation)=>new(this,character,generation);
+    public AlsRefactoredLocomotionHost CreateRuntime(uint character,uint generation,AlsRefactoredNotifyBank? notifies=null)=>new(this,character,generation,notifies);
 
     /// <summary>Full original moving-player inventory for shared host traversal.
     /// Teleport evaluators do not register asset ticks.</summary>
@@ -97,8 +97,8 @@ public sealed class AlsRefactoredLocomotionHost : IAlsRefactoredLocomotionPoseSi
     public AlsRefactoredMovementState Movement=>Actions.MovementParent.MovementCandidate;
     public ReadOnlySpan<AlsPrecisePose> Pose=>Graph.Pose;
     public ReadOnlySpan<AlsInertialCurve> Curves=>Graph.Curves;
-    internal AlsRefactoredLocomotionHost(AlsRefactoredLocomotionHostProfile profile,uint character,uint generation)
-    {_p=profile;Sources=profile.CreateSourceScope(character,generation);Actions=new(profile.Actions,character,generation,Sources);Graph=new(profile.Pose,profile.Actions.Standing.Sync,Sources);}
+    internal AlsRefactoredLocomotionHost(AlsRefactoredLocomotionHostProfile profile,uint character,uint generation,AlsRefactoredNotifyBank? notifies=null)
+    {_p=profile;Sources=profile.CreateSourceScope(character,generation,notifies);Actions=new(profile.Actions,character,generation,Sources);Graph=new(profile.Pose,profile.Actions.Standing.Sync,Sources);}
     public void BeginGlobal(in AlsPoseUpdateContext context,in AlsRefactoredLocomotionHostInput input,
         AlsGraphTraversalCounter initialization,bool initialize=false)
     {

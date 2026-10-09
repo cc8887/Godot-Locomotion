@@ -12,6 +12,67 @@ namespace GodotAls.Core.Tests;
 public sealed class AlsP5SourceEventTests
 {
     [Fact]
+    public void OriginalSourceJoinsCharacterLifecycleAndRetryWithoutLegacyTicks()
+    {
+        var f=new Fixture(); var binding=new AdditionalBinding(f.Policies);
+        var input=new AlsAdditionalSourceNotify(new(new(4,20,.35f,true,false),
+            AlsAssetNotifySourceKind.AssetPlayer,80,true,.4f,2,.9f),true);
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(1,0,1),.1f,[],0,default,
+            out var state,out var events,out _,montageBinding:binding,
+            montageDirectNotifies:[MontageInstantInput(55)],additionalSources:[input]));
+        Assert.Equal(3,events.Count);
+        Assert.Equal(100,events[0].EventId); Assert.Equal(AlsTimelineEventKind.RootMotionScale,events[1].Kind);
+        Assert.Equal(AlsAnimationEventPhase.Begin,events[1].Phase);Assert.Equal(AlsAnimationEventPhase.Tick,events[2].Phase);
+        Assert.Equal(2,events[1].PlaybackEpoch);Assert.Equal(-1,events[1].SourceActionId);
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(1,0,1),.1f,[],0,default,
+            out var retry,out var retryEvents,out _,montageBinding:binding,
+            montageDirectNotifies:[MontageInstantInput(55)],additionalSources:[input]));
+        SameState(state,retry);SameEvents(events,retryEvents);
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,state,
+            out var hidden,out var ended,out _,montageBinding:binding));
+        Assert.Equal(0,hidden.ActiveCount);Assert.Equal(1,ended.Count);
+        Assert.Equal(AlsAnimationEventPhase.End,ended[0].Phase);Assert.False(ended[0].NativeContext.ReachedEnd);
+        Assert.False(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,state,
+            out _,out _,out _,montageBinding:binding,additionalSources:[input with {Input=input.Input with {EffectiveWeight=float.NaN}}]));
+        Assert.Equal(1,state.ActiveCount);
+        // A full enclosing Montage queue plus source state callbacks cannot
+        // partially publish the otherwise valid original-source candidate.
+        var overflowing=Enumerable.Range(0,16).Select(_=>MontageInstantInput(77)).ToArray();
+        Assert.False(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(2,0,1),.1f,[],0,state,
+            out var failed,out var partial,out var failure,montageBinding:binding,
+            montageDirectNotifies:overflowing,additionalSources:[input]));
+        Assert.Equal(AlsP5FailureCode.EventBufferOverflow,failure);Assert.False(failed.Initialized);Assert.Equal(0,partial.Count);
+    }
+
+    [Fact]
+    public void AdditionalSourceFollowerAndWeightFilteringShareExistingRandomState()
+    {
+        var f=new Fixture();var binding=new AdditionalBinding(f.Policies);
+        var input=new AlsAdditionalSourceNotify(new(new(4,20,.35f,true,false),AlsAssetNotifySourceKind.AssetPlayer,80,true,.4f,2,.9f),false);
+        Assert.True(AlsP5Runtime.TryPrepareSourceEvents(f.Bindings,new(1,0,1),.1f,[],0,default,
+            out var state,out var events,out _,montageBinding:binding,additionalSources:[input]));
+        Assert.Equal(0,events.Count);Assert.Equal(AlsTimelineRuntime.InitialAssetNotifyRandomSeed,state.RandomSeed);
+    }
+
+    private sealed class AdditionalBinding: IAlsMontageNotifyBinding
+    {
+        private readonly MontageStateBinding _montage;private readonly AlsAssetNotifyPolicy[] _policies;
+        public AdditionalBinding(AlsAssetNotifyPolicy[] sources)
+        {
+            _montage=new(sources);_policies=[.._montage.Policies.ToArray(),
+                new(200,0,0,-1,200,200,0,1,0,0,AlsTimelineTickMode.Queued,true,true,false)];
+        }
+        public int SourcePolicyCount=>_montage.SourcePolicyCount;
+        public ReadOnlySpan<AlsAssetNotifyPolicy> Policies=>_policies;
+        public bool TryTimeline(in AlsAssetNotifyReference reference,out AlsTimelineEventDefinition timeline)
+        {
+            if(reference.PolicyIndex<4)return _montage.TryTimeline(reference,out timeline);
+            timeline=new(200,30,-1,20,AlsTimelineSourceKind.Animation,0,0,0,.1f,.4f,0,
+                AlsTimelineEventKind.RootMotionScale,AlsTimelineTickMode.Queued,new(200,0,0,0,1.3f,0,AlsActionResultCode.None));
+            return reference.PolicyIndex==4&&reference.OccurrenceHandleId==20;
+        }
+    }
+    [Fact]
     public void FailureEndsOldNativeOwnershipBeforeMergingANewPlaybackOfTheSameClass()
     {
         var f = new Fixture(); var binding = new MontageStateBinding(f.Policies);

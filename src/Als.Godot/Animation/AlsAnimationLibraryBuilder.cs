@@ -90,7 +90,7 @@ public sealed class AlsAnimationLibraryBuildResult : IDisposable
             // Isolated graph fixtures also consume the same verified production closure.
             // Production installs its shared bank before building any pose graph.
             var profile = AlsLocomotionProfileCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/p4_cycle_locomotion_profile.json"), set);
+                GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "p4_cycle_locomotion_profile.json"), set);
             UseMovementSources(set, AlsMovementGraphDefinition.Load(set, profile).RawSources);
         }
         if (_movementPoseSources!.Skeleton.SkeletonId != skeletonId || _movementPoseSources.Bank.DefinitionDigest != set.DefinitionDigest)
@@ -251,11 +251,11 @@ public static class AlsAnimationLibraryBuilder
         if (profile.StandingWalkRun.Length == 6)
         {
             var detail = AlsLocomotionDetailCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/v4_locomotion_detail_graph.json"), animationSet, profile.SkeletonId);
+                GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_detail_graph.json"), animationSet, profile.SkeletonId);
             var detailIds = detail.States.SelectMany(state => state.Players)
                 .SelectMany(player => new[] { player.AnimationId, player.AdditiveBaseAnimationId });
             var sources = AlsLocomotionSourceCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/v4_locomotion_source_graph.json"), animationSet, profile.SkeletonId);
+                GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_source_graph.json"), animationSet, profile.SkeletonId);
             animationIds = animationIds.Concat(detailIds).Concat(sources.Samples
                 .Select(s => s.AnimationId)).Distinct().Order().ToArray();
         }
@@ -283,7 +283,7 @@ public static class AlsAnimationLibraryBuilder
         var animationIds = BuildP4AnimationClosure(animationSet, profile, poseProfile);
         if (detailProfile is null && profile.StandingWalkRun.Length == 6)
             detailProfile = AlsLocomotionDetailCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/v4_locomotion_detail_graph.json"), animationSet, profile.SkeletonId);
+                GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_detail_graph.json"), animationSet, profile.SkeletonId);
         if (detailProfile is not null)
         {
             if (detailProfile.SkeletonId != profile.SkeletonId)
@@ -296,7 +296,7 @@ public static class AlsAnimationLibraryBuilder
         if (profile.StandingWalkRun.Length == 6)
         {
             var sources = sourceProfile ?? AlsLocomotionSourceCompiler.Compile(Godot.FileAccess.GetFileAsString(
-                "res://assets/config/v4_locomotion_source_graph.json"), animationSet, profile.SkeletonId);
+                GodotAls.Import.AlsAnimationResourcePack.ConfigRoot + "v4_locomotion_source_graph.json"), animationSet, profile.SkeletonId);
             if (sources.SkeletonId != profile.SkeletonId || sources.AnimationSetDefinitionDigest != animationSet.DefinitionDigest)
                 throw new InvalidOperationException("Source library definition differs.");
             animationIds = animationIds.Concat(sources.Samples.Select(s => s.AnimationId)).Distinct().Order().ToArray();

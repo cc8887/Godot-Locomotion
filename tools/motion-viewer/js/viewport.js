@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from '../vendor/FBXLoader.js';
 import { BVHLoader } from 'three/addons/loaders/BVHLoader.js';
+import { COMPARISON_SPACE, isRootBone, originMetrics } from './comparison-space.js';
+import { sourceMotionObject } from './source-motion.js';
 import { normalizeOfflineFbxIndent } from './offline-fbx-text.js';
 
 export const KIND_COLOR = {
@@ -11,7 +13,7 @@ export const KIND_COLOR = {
 const KIND_SIZE = { root: 16, pelvis: 13, ik: 13, foot: 11, hand: 11, head: 11 };
 
 export function classifyBone(name) {
-  if (/^root$/i.test(name)) return 'root';
+  if (isRootBone(name)) return 'root';
   if (/pelvis|hips/i.test(name)) return 'pelvis';
   if (/^(ik_|vb_)|^virtual/i.test(name)) return 'ik';
   if (/foot|ankle|ball|toe/i.test(name)) return 'foot';
@@ -64,19 +66,36 @@ function aliasRootBone(object, clips) {
   if (rewrote) rootBone.name = ALIAS;
 }
 
+// 管线 FBX 均为 ASCII 且 GlobalSettings 头部带 UpAxis 声明；
+// 扫描文件头按文件自身约定处理（2 = Z-up，UE/ALS 导出；1 = Y-up）。
+// 二进制 FBX 或读取异常时回退 Z-up（管线全部产物为 UE 约定）。
+function detectFbxUpAxis(buf) {
+  try {
+    const n = Math.min(buf.byteLength, 8192);
+    const head = new Uint8Array(buf, 0, n);
+    let s = '';
+    for (let i = 0; i < n; i++) s += String.fromCharCode(head[i]);
+    const m = s.match(/P:\s*"UpAxis"[^0-9-]*(\d)/);
+    if (m) return m[1] === '2' ? 'z' : 'y';
+  } catch (e) { /* binary FBX 或读取异常，走回退 */ }
+  return 'z';
+}
+
 export class Viewer {
   constructor(canvas, opts = {}) {
     this.canvas = canvas;
     this.onLoaded = opts.onLoaded || (() => {});
     this.onError = opts.onError || (() => {});
     this.onFrame = opts.onFrame || (() => {});
+    this.onCameraChange = opts.onCameraChange || (() => {});
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(0x0f1115);
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.5, 20000);
-    this.camera.position.set(150, 140, 260);
+    this.verticalSpanCm = COMPARISON_SPACE.verticalSpanCm;
+    this.camera = new THREE.OrthographicCamera(-400, 400, 400, -400, 0.1, 20000);
+    this.camera.position.fromArray(COMPARISON_SPACE.cameraPosition);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x28303c, 2.2));
     const dir = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -90,8 +109,24 @@ export class Viewer {
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.target.set(0, 90, 0);
-    this.controls.enableDamping = true;
+    this.controls.enableDamping = false;
     this.controls.dampingFactor = 0.08;
+    this.controls.enablePan = false;
+    this.controls.addEventListener('change', () => {
+      if (!this._copyingCamera) this.onCameraChange(this.cameraState());
+    });
+    const cross = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-25, 0.2, 0), new THREE.Vector3(25, 0.2, 0),
+      new THREE.Vector3(0, 0.2, -25), new THREE.Vector3(0, 0.2, 25),
+    ]);
+    this.scene.add(new THREE.LineSegments(cross, new THREE.LineBasicMaterial({ color: 0xffffff })));
+    this.originGuide = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(),
+    ]), new THREE.LineBasicMaterial({ color: KIND_COLOR.pelvis, depthTest: false }));
+    this.scene.add(this.originGuide);
+    this.metricsLabel = document.createElement('div');
+    this.metricsLabel.className = 'vp-origin';
+    canvas.parentElement.appendChild(this.metricsLabel);
 
     this.pivot = null;
     this.model = null;
@@ -102,36 +137,69 @@ export class Viewer {
     this.skelHelper = null;
     this.trailLine = null;
     this.trailBoneName = null;
+    this.trailLines = [];
     this._texCache = {};
     this.playing = true;
     this.speed = 1;
     this.loop = true;
-    this.upAxis = 'y';
+    // 显示约定：'z' = ALS 原版 Z-up（默认，Z-up 资产直立、轴指示 Z 朝上）；
+    // 'y' = three.js 原生（按资产原始朝向显示，用于诊断轴问题）。
+    this.upAxis = 'z';
+    this.contentUp = null; // 'y' | 'z'：每次 load 检测的源数据朝向
+    this._applyOrientation();
     this._resize();
   }
 
   _resize() {
     const w = this.canvas.clientWidth || 2;
     const h = this.canvas.clientHeight || 2;
+    this._lastW = w;
+    this._lastH = h;
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
+    const half = this.verticalSpanCm / 2;
+    this.camera.left = -half * w / h;
+    this.camera.right = half * w / h;
+    this.camera.top = half;
+    this.camera.bottom = -half;
     this.camera.updateProjectionMatrix();
   }
 
   resize() { this._resize(); }
 
   resetCamera() {
-    if (!this.model) {
-      this.camera.position.set(150, 140, 260);
-      this.controls.target.set(0, 90, 0);
-      return;
-    }
     this._frameCamera();
+  }
+
+  cameraState() {
+    return { position: this.camera.position.toArray(), target: this.controls.target.toArray(),
+      zoom: this.camera.zoom, verticalSpanCm: this.verticalSpanCm };
+  }
+
+  applyCameraState(state) {
+    this._copyingCamera = true;
+    this.camera.position.fromArray(state.position);
+    this.controls.target.fromArray(state.target);
+    this.camera.zoom = state.zoom;
+    this.verticalSpanCm = state.verticalSpanCm;
+    this._resize();
+    this.controls.update();
+    this._copyingCamera = false;
   }
 
   setUpAxis(axis) {
     this.upAxis = axis;
-    if (this.pivot) this.pivot.rotation.x = axis === 'z' ? -Math.PI / 2 : 0;
+    this._applyOrientation();
+  }
+
+  // 显示朝向统一处理：
+  // - 'z'（ALS 原版）：轴指示器旋转 -90°X，蓝色 Z 轴朝上（UE 约定）；
+  //   Z-up 内容（FBX）pivot 旋转 -90°X 直立，Y-up 内容（BVH）保持直立。
+  // - 'y'（原始数据）：一切归零，FBX 按原始 Z-up 躺平、BVH 直立，用于诊断。
+  _applyOrientation() {
+    this.axes.rotation.x = this.upAxis === 'z' ? -Math.PI / 2 : 0;
+    if (!this.pivot) return;
+    const standZup = this.upAxis === 'z' && this.contentUp === 'z';
+    this.pivot.rotation.x = standZup ? -Math.PI / 2 : 0;
   }
 
   setPlaying(v) {
@@ -153,14 +221,15 @@ export class Viewer {
     if (!this.action || !this.clip) return;
     const dur = this.clip.duration || 0;
     this.action.time = Math.max(0, Math.min(t, dur));
-    if (!this.playing) {
-      this.action.paused = false;
-      this.mixer.update(0);
-      this.action.paused = true;
-    }
+    const paused = this.action.paused;
+    this.action.paused = false;
+    this.mixer.update(0);
+    this.action.paused = paused;
+    this.model?.updateMatrixWorld(true);
   }
 
   clearScene() {
+    this._loadGeneration = (this._loadGeneration || 0) + 1;
     if (this.mixer) { this.mixer.stopAllAction(); this.mixer = null; }
     this.action = null;
     this.clip = null;
@@ -170,12 +239,15 @@ export class Viewer {
       this.skelHelper.dispose?.();
       this.skelHelper = null;
     }
-    if (this.trailLine) {
-      this.trailLine.parent?.remove(this.trailLine);
-      this.trailLine.geometry.dispose();
-      this.trailLine.material.dispose();
-      this.trailLine = null;
+    for (const line of this.trailLines) {
+      line.parent?.remove(line); line.geometry.dispose(); line.material.dispose();
     }
+    this.trailLines = [];
+    this.trailLine = null;
+    this.trailBoneName = null;
+    this.metricsLabel.textContent = '固定原点 O · cm';
+    this.metricsLabel.classList.remove('bad');
+    this.originGuide.visible = false;
     this._clearMarkers();
     if (this.pivot) {
       this.pivot.traverse((o) => {
@@ -192,13 +264,19 @@ export class Viewer {
 
   async load(url, ext, fileName) {
     this.clearScene();
+    const generation = this._loadGeneration;
     this.pivot = new THREE.Group();
     this.scene.add(this.pivot);
-    this.setUpAxis(this.upAxis);
 
     let object;
     let takes = [];
-    if (ext === '.bvh') {
+    if (ext === '.source-motion') {
+      const response = await fetch(url, {cache:'no-store'});
+      if (!response.ok) throw new Error('源动画读取失败');
+      const data = await response.json();
+      const parsed = sourceMotionObject(data, THREE);
+      object = parsed.object; takes = [parsed.clip]; this.contentUp = data.up;
+    } else if (ext === '.bvh') {
       const res = await new BVHLoader().loadAsync(url);
       if (!res || !res.skeleton || !res.clip) throw new Error('BVH 解析失败');
       // BVHLoader returns { skeleton, clip }; skeleton itself is a
@@ -207,14 +285,18 @@ export class Viewer {
       object = res.skeleton.bones[0];
       if (!object) throw new Error('BVH 无骨骼');
       takes = [res.clip];
+      this.contentUp = 'y'; // SOMA BVH 为 Y-up（骨骼沿 +Y 生长）
     } else {
       const buf = await new THREE.FileLoader()
         .setResponseType('arraybuffer')
         .loadAsync(url);
+      this.contentUp = detectFbxUpAxis(buf);
       object = new FBXLoader().parse(normalizeOfflineFbxIndent(buf), '');
       takes = object.animations ? object.animations.slice() : [];
     }
 
+    if (generation !== this._loadGeneration) throw new Error('Load superseded');
+    this._applyOrientation();
     normalizeTrackNames(object, takes);
     aliasRootBone(object, takes);
 
@@ -229,9 +311,7 @@ export class Viewer {
     if (takes.length) {
       this.mixer = new THREE.AnimationMixer(this.pivot);
       this.playTake(0);
-      this._sampleTrail();
     }
-    this._frameCamera();
     this.onLoaded({ fileName, takes });
     return { takes };
   }
@@ -247,6 +327,7 @@ export class Viewer {
     this.action.time = 0;
     this.action.play();
     this.mixer.update(0);
+    this._sampleTrail();
   }
 
   _buildSkeletonHelper() {
@@ -316,34 +397,18 @@ export class Viewer {
   }
 
   _frameCamera() {
-    const box = new THREE.Box3();
-    const v = new THREE.Vector3();
-    let any = false;
-    this.model.traverse((o) => {
-      o.getWorldPosition(v);
-      box.expandByPoint(v);
-      any = true;
-    });
-    if (!any) return;
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z, 20);
-    this.controls.target.copy(center);
-    const dirv = new THREE.Vector3(1, 0.5, 1.35).normalize();
-    this.camera.position.copy(center).addScaledVector(dirv, maxDim * 1.55);
-    this.camera.near = Math.max(maxDim / 400, 0.1);
-    this.camera.far = maxDim * 80;
+    this.controls.target.fromArray(COMPARISON_SPACE.target);
+    this.camera.position.fromArray(COMPARISON_SPACE.cameraPosition);
+    this.camera.zoom = 1;
     this.camera.updateProjectionMatrix();
-    const gs = Math.max(1, maxDim / 200);
-    this.grid.scale.setScalar(gs);
-    this.axes.scale.setScalar(Math.max(1, maxDim / 120));
+    this.controls.update();
   }
 
   _candidateTrailBones() {
     const cands = [];
     this.model.traverse((o) => {
       if (!o.isBone || !o.name) return;
-      if (/^root$/i.test(o.name) || /pelvis|hips/i.test(o.name)) cands.push(o);
+      if (isRootBone(o.name) || /pelvis|hips/i.test(o.name)) cands.push(o);
     });
     return cands.slice(0, 2);
   }
@@ -354,14 +419,20 @@ export class Viewer {
     if (dur <= 0) return;
     const cands = this._candidateTrailBones();
     if (!cands.length) return;
-    const N = Math.max(2, Math.min(120, Math.round(dur * 30)));
+    for (const line of this.trailLines) {
+      line.parent?.remove(line); line.geometry.dispose(); line.material.dispose();
+    }
+    this.trailLines = [];
+    // Preserve authored key times as well as 60 Hz subframes and both endpoints.
+    const times = [...new Set([0, dur, ...this.clip.tracks.flatMap(t => Array.from(t.times)),
+      ...Array.from({ length: Math.ceil(dur * 60) + 1 }, (_, i) => Math.min(i / 60, dur))])].sort((a, b) => a - b);
     const paths = cands.map(() => []);
     const wasPlaying = this.playing;
     const t0 = this.action.time;
     this.action.paused = false;
     const v = new THREE.Vector3();
-    for (let i = 0; i < N; i++) {
-      this.action.time = (dur * i) / (N - 1);
+    for (const time of times) {
+      this.action.time = time;
       this.mixer.update(0);
       this.model.updateMatrixWorld(true);
       cands.forEach((b, ci) => {
@@ -374,24 +445,52 @@ export class Viewer {
     this.mixer.update(0);
     this.action.paused = !wasPlaying;
 
-    let best = -1, bestLen = -1;
     paths.forEach((pts, ci) => {
-      let len = 0;
-      for (let i = 1; i < pts.length; i++) len += pts[i].distanceTo(pts[i - 1]);
-      if (len > bestLen) { bestLen = len; best = ci; }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: KIND_COLOR[classifyBone(cands[ci].name)],
+        transparent: true, opacity: 0.85 });
+      const line = new THREE.Line(geo, mat);
+      line.userData.boneName = cands[ci].name;
+      this.pivot.add(line); this.trailLines.push(line);
     });
-    if (best < 0 || bestLen < 0.5) return;
-    const geo = new THREE.BufferGeometry().setFromPoints(paths[best]);
-    const mat = new THREE.LineBasicMaterial({ color: 0xffb02e, transparent: true, opacity: 0.85 });
-    this.trailLine = new THREE.Line(geo, mat);
-    this.trailLine.renderOrder = 1;
-    this.pivot.add(this.trailLine);
-    this.trailBoneName = cands[best].name;
+    this.model.updateMatrixWorld(true);
+  }
+
+  originSnapshot() {
+    this.model?.updateMatrixWorld(true);
+    const position = b => b ? b.getWorldPosition(new THREE.Vector3()).toArray() : null;
+    const bones = this.keyBones();
+    return { timeSeconds: this.action?.time ?? null, durationSeconds: this.clip?.duration ?? null,
+      sourceUp: this.contentUp, displayConvention: this.upAxis,
+      ...originMetrics(position(bones.find(b => isRootBone(b.name))),
+        position(bones.find(b => classifyBone(b.name) === 'pelvis'))), camera: this.cameraState() };
   }
 
   update(dt) {
+    // Self-heal: viewers created while hidden get a 2x2 fallback buffer;
+    // once the container becomes visible clientWidth/Height recover, so
+    // re-sync the drawing buffer every frame when the layout size changes.
+    const cw = this.canvas.clientWidth || 2;
+    const ch = this.canvas.clientHeight || 2;
+    if (cw !== this._lastW || ch !== this._lastH) this._resize();
+
     if (this.mixer && this.playing) this.mixer.update(dt * this.speed);
     this.controls.update();
+    const m = this.originSnapshot();
+    this.originGuide.visible = !!(m.rootCm && m.pelvisCm);
+    if (this.originGuide.visible) {
+      const vertices = this.originGuide.geometry.attributes.position;
+      vertices.setXYZ(0, 0, .2, 0);
+      vertices.setXYZ(1, m.rootCm[0], .2, m.rootCm[2]);
+      vertices.setXYZ(2, m.pelvisCm[0], .2, m.pelvisCm[2]);
+      vertices.needsUpdate = true;
+      this.originGuide.geometry.computeBoundingSphere();
+    }
+    const fmt = v => v == null ? '未知' : v.toFixed(1);
+    this.metricsLabel.textContent = `固定原点 O · cm\nroot→O ${fmt(m.rootOriginHorizontalCm)}\npelvis→O ${fmt(m.pelvisOriginHorizontalCm)}\npelvis→root ${fmt(m.pelvisRootHorizontalCm)}`;
+    // Observation only: a source locomotion clip may intentionally travel.
+    // Red highlights separation, not a universal animation acceptance verdict.
+    this.metricsLabel.classList.toggle('bad', m.pelvisRootHorizontalCm > 50);
     this.renderer.render(this.scene, this.camera);
     if (this.action && this.clip) {
       const dur = this.clip.duration || 1;

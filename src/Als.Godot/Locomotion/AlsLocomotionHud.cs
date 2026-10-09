@@ -32,9 +32,11 @@ public partial class AlsLocomotionHud : VBoxContainer
 
     public void EnableActionPreview()
     {
+        CreateLabel("RuntimePolicy").Text =
+            $"Root Motion {(GodotAls.Animation.AlsAnimationRuntimeOptions.RootMotionEnabled ? "ON" : "OFF")} | Pack {GodotAls.Import.AlsAnimationResourcePack.DisplayName}";
         var label = CreateLabel("ActionPreviewHelp");
         var action = GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--rolling-gameplay") ? "地面翻滚" :
-            GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--montage-root-motion") ? "翻滚位移测试" : "原地翻滚动画预览";
+            GodotAls.Animation.AlsAnimationRuntimeOptions.Has("--montage-root-motion") && GodotAls.Animation.AlsAnimationRuntimeOptions.SampleRootMotion ? "翻滚位移测试" : "原地翻滚动画预览";
         label.Text = $"R：{action}  |  X：取消动作  |  G：进入 / 退出 Ragdoll  |  Q / E：切换 Overlay 道具";
     }
 
@@ -74,7 +76,7 @@ public partial class AlsLocomotionHud : VBoxContainer
                     $"{(result.RotateDirection < 0 ? 'L' : 'R')}@{result.RotatePhase:0.00}");
             _stateLabel.Text = string.Join('\n',
                 FormattableString.Invariant(
-                    $"Frame {diagnostics.CommittedFrameId} | {result.ResolvedLocomotionState} | Mode {result.ActualRotationMode} | Speed {speed:0.00}"),
+                    $"Frame {diagnostics.CommittedFrameId} | {result.ResolvedLocomotionState} | Mode {result.ActualRotationMode} | Speed {speed:0.00} m/s"),
                 FormattableString.Invariant(
                     $"Aim ({result.AimRelativeYaw:+0.00;-0.00;+0.00},{result.AimRelativePitch:+0.00;-0.00;+0.00}) | Turn {turn} | Rotate {rotate} | Phase {result.AnimationPhase:0.00}"),
                 FormattableString.Invariant(

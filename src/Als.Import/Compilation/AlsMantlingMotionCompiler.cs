@@ -7,9 +7,10 @@ namespace GodotAls.Import.Compilation;
 public sealed record AlsMantlingMotionDefinition(AlsMantlingSettingsDefinition Settings,
     AlsMontageRootTransformSampler Roots, float BlendInTime, AlsActionBlendOption BlendInOption)
 {
-    public AlsMantlingWarpSettings CreateWarpSettings(float height,double samplingFramesPerSecond)
+    public AlsMantlingWarpSettings CreateWarpSettings(float height,double samplingFramesPerSecond,bool useRootMotion=true)
     {
-        var start=Settings.CalculateStartTime(height,samplingFramesPerSecond,t=>Roots.Sample(t).Position.Z);
+        var start=useRootMotion ? Settings.CalculateStartTime(height,samplingFramesPerSecond,t=>Roots.Sample(t).Position.Z)
+            : AlsMantlingStartTime.MapHeight(height,Settings.ReferenceLow,Settings.ReferenceHigh,Settings.TimeLow,Settings.TimeHigh);
         return new((Settings.MontageLength-start)/Settings.RateScale,start,Settings.RateScale,
             BlendInTime,BlendInOption,Settings.WarpStart,Settings.WarpEnd,Settings.LocationBlend,Settings.RotationBlend);
     }
