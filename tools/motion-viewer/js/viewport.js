@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from '../vendor/FBXLoader.js';
 import { BVHLoader } from 'three/addons/loaders/BVHLoader.js';
+import { normalizeOfflineFbxIndent } from './offline-fbx-text.js';
 
 export const KIND_COLOR = {
   root: 0xff7a1a, pelvis: 0xff3d81, ik: 0xb44cff,
@@ -210,7 +211,7 @@ export class Viewer {
       const buf = await new THREE.FileLoader()
         .setResponseType('arraybuffer')
         .loadAsync(url);
-      object = new FBXLoader().parse(buf, '');
+      object = new FBXLoader().parse(normalizeOfflineFbxIndent(buf), '');
       takes = object.animations ? object.animations.slice() : [];
     }
 
