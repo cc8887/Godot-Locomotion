@@ -1,5 +1,6 @@
 # Lyra 当前目标：可玩的 locomotion 与 ALS/Core 复用（2026-10-04）
 
+2026-10-09 默认鼠标行为：普通 Demo 启动时保持可见、自由指针，只有主动按 Esc 才捕获；失焦释放实际鼠标模式，回到窗口不自动捕获。优化构建、真实 Godot headless 360 帧键鼠回归与 P3 输入场景通过；未执行图形窗口人工焦点／悬停验收。见[修复与验证](docs/verification/2026-10-09-default-mouse-capture.md)。
 2026-10-05：默认 Demo 已接同一世界内的 ALS／Lyra 主控切换，F6 或顶部按钮选择，启动参数只决定初始模式。交接世界位置／速度／蹲伏与视角，动作期间延后，保留装备／Overlay 与原场景平台。验证范围见 [运行时切换](docs/verification/2026-10-05-demo-locomotion-switch.md)，其余动画、物理及人工验收范围仍按本路线推进。
 
 本节按用户最新要求定义当前验收，优先于后面的历史原生逐项还原口径：迁移 Lyra 的 locomotion 思路和运动核心算法，不要求完整复刻 UE 的全部内部行为。武器覆盖 **手枪和步枪**；Unarmed 保留为基础与切换回退。URO 等 UE 原生优化进入后续路线，Shotgun/Feminine 等额外 Provider 不作为当前交付门槛。

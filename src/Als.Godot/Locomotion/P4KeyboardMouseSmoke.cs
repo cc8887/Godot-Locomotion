@@ -62,6 +62,8 @@ public partial class P4KeyboardMouseSmoke : Node
             AddChild(entry);
             _demo = entry.Demo;
             Require(_demo.IsRuntimeReady, "Production Demo did not initialize.");
+            Require(!_demo.OrbitCamera.IsMouseCaptured && Input.MouseMode == Input.MouseModeEnum.Visible,
+                "Production Demo must start with a visible, unrestricted pointer.");
             var floor = _demo.GetNode<StaticBody3D>("World/StartFloor");
             var size = new Vector3(40f, .5f, 40f);
             var floorShape = floor.GetNode<CollisionShape3D>("CollisionShape3D");
@@ -72,11 +74,14 @@ public partial class P4KeyboardMouseSmoke : Node
                 if (terrain != floor) DisableTerrain(terrain);
             _demo.OrbitCamera.SetMouseCaptured(true);
             _demo.OrbitCamera.Notification((int)Node.NotificationWMWindowFocusOut);
-            Require(!_demo.OrbitCamera.IsMouseCaptured, "Defocus must release the tracked capture state.");
+            Require(!_demo.OrbitCamera.IsMouseCaptured && Input.MouseMode == Input.MouseModeEnum.Visible,
+                "Defocus must release both the tracked capture and the engine pointer mode.");
             _demo.OrbitCamera.Notification((int)Node.NotificationWMWindowFocusIn);
-            Require(_demo.OrbitCamera.IsMouseCaptured &&
-                (DisplayServer.GetName() == "headless" || Input.MouseMode == Input.MouseModeEnum.Captured),
-                "Refocusing must restore the requested mouse capture.");
+            Require(!_demo.OrbitCamera.IsMouseCaptured && Input.MouseMode == Input.MouseModeEnum.Visible,
+                "Refocusing must not reacquire the pointer.");
+            _demo.OrbitCamera._Input(new InputEventAction { Action = "mouse_capture_toggle", Pressed = true });
+            Require(_demo.OrbitCamera.IsMouseCaptured,
+                "Explicit Esc action must still enable mouse capture.");
         }
         catch (Exception exception) { Fail(exception); }
     }

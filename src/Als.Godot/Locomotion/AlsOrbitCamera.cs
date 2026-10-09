@@ -8,7 +8,6 @@ public partial class AlsOrbitCamera : Node3D
     private SpringArm3D? _springArm;
     private float _yaw;
     private float _pitch = -0.2f;
-    private bool _captureRequested = true;
 
     [Export(PropertyHint.Range, "0.0005,0.02,0.0005")]
     public float MouseSensitivity { get; set; } = 0.0025f;
@@ -53,7 +52,7 @@ public partial class AlsOrbitCamera : Node3D
             ?? throw new InvalidOperationException(
                 "ALS orbit camera requires a SpringArm3D child named SpringArm3D.");
         ApplyOrbit();
-        SetMouseCaptured(DisplayServer.GetName() != "headless");
+        SetMouseCaptured(false);
     }
 
     public void Configure(Node3D target)
@@ -109,7 +108,6 @@ public partial class AlsOrbitCamera : Node3D
 
     public void SetMouseCaptured(bool captured)
     {
-        _captureRequested = captured;
         IsMouseCaptured = captured;
         Input.MouseMode = captured
             ? Input.MouseModeEnum.Captured
@@ -121,13 +119,8 @@ public partial class AlsOrbitCamera : Node3D
         switch (what)
         {
             case (int)NotificationWMWindowFocusOut:
-                IsMouseCaptured = false;
-                break;
-            case (int)NotificationWMWindowFocusIn:
-                IsMouseCaptured = _captureRequested;
-                Input.MouseMode = _captureRequested
-                    ? Input.MouseModeEnum.Captured
-                    : Input.MouseModeEnum.Visible;
+                // Returning to the window must never reacquire the user's pointer.
+                SetMouseCaptured(false);
                 break;
         }
     }

@@ -39,7 +39,7 @@ public partial class AlsLocomotionHud : VBoxContainer
     }
 
     public void EnableNativeCameraHelp() => CreateLabel("CameraHelp").Text =
-        "鼠标：转动视角  |  B：第一 / 第三人称  |  T：左右换肩";
+        "Esc：捕获 / 释放鼠标（默认释放，失焦释放）  |  鼠标：捕获后转动视角  |  B：第一 / 第三人称  |  T：左右换肩";
 
     public override void _Ready()
     {
