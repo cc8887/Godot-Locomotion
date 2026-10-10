@@ -1,5 +1,25 @@
 # Lyra 当前目标：可玩的 locomotion 与 ALS/Core 复用（2026-10-04）
 
+2026-10-10 Mantle 曲线判断已固化：新导出按 `mantle-curve-semantics-v1` 保留独立原始 Root 前移、记录避障平台段，声明仅高度入口匹配与时间驱动控制，拒绝持续距离驱动／Root Motion Warping 的虚假支持声明；烘焙／stage／启用／运行前门禁已接入。相关 Python 49/49，当前最终输入的独立烘焙及实际 .NET Import 三 sequence／173 键对照通过，原控制值及活动包保持。尚未新增持续匹配或 Mantle Root Motion Warping；旧包重新进入新 Pipeline 需构建新版本。本次无新 Kimodo 生成、最终 FBX 或 Godot 游戏验收。见[曲线语义门禁验证](docs/verification/2026-10-10-mantle-curve-semantics-gates.md)。
+
+2026-10-10 Mantle 文档合同：已明确 Pipeline 必须随包导出控制曲线、Godot ALS／其他导入项目必须识别并实际应用；补充 High 目标蒙皮避障前移的计算、字段／摘要／时间轴、缺失处理和发布端几何复核与 Import 校验的边界。见[稳定双向交付契约](docs/architecture/als-mantle-contact-control.md#pipeline-与导入项目的双向交付契约)与[文档核对记录](docs/verification/2026-10-10-mantle-curve-delivery-contract.md)。本次只更新文档，不新增能力协商字段或扩大既有运行验收范围。
+
+2026-10-10 当前中高攀爬：实际生成 High／两个 Low，六个交付身份通过源与目标门禁；与其余 117 个最新动作组成 `als_nonprop_20261010_mantle_high_combined_v5`，123 个最终 FBX 回读和 1,524 个载荷摘要通过。新增目标蒙皮前移曲线、组件空间手部过渡 IK 和按实际台面高度提前完成的准备段抬升，保持资产 Root／Pelvis 与统一时钟。真实 Godot 的 1.2–2 m、两侧 Low 支撑及移动 High，三 Hz 共 21/21、8,820 帧和 300 张 GPU 截图通过原 2 cm 蒙皮门槛，支撑残差为零。普通默认已选择本轮生成包，无环境覆盖重启与实际游戏窗口确认。仍为诊断包：60 个非道具缺口、Root 开启／原版对照、取消后的姿态及完整矩阵／人工／性能验收继续开放；不得把正常中高范围通过升级为完整生产验收。详细结果与失败见[中高攀爬验证](docs/verification/2026-10-10-medium-high-mantle.md)。
+
+2026-10-10 Mantle 生产后手部 IK：已用真实目标蒙皮修复生成指节、接近／释放手臂和固定掌面下的过渡姿态，保留 Root/Pelvis、腿、躯干与骨长，重出四个 Low 身份及最终曲线／FBX。Godot 标准 1 m 两侧三 Hz／单并行／GPU 的九项 Root 关闭检查通过，整段峰值 ≤1.531 cm；移动 Low 通过，峰值 1.469 cm。42 项 Python 与四个最终 FBX 回读通过，6,840 个诊断帧身份和新 830／旧 829 载荷完整性通过，普通 Demo 使用新包启动。剩余失败保留：0.75 m 进动作混合 3.516 cm、取消后的足部 20.090 cm、Root 开启 3.320 cm，以及原版 High 回退；关闭手锁的负对照也失败。新包仍诊断，默认指针保留旧 v4。下一步处理短台阶的进动作混合／取消姿态与 Root 开启接触，继续生成合格 High；完整生产、整动作美术与性能验收未关闭。见[稳定修复合同](docs/architecture/kimodo-mantle-hand-skin-repair.md)与[本批实际导入和游戏证据](docs/verification/2026-10-10-mantle-hand-skin-repair.md)。
+
+2026-10-09 Mantle 专用曲线与固定支撑：已烘焙前移／抬升、剩余高度、双手接触权重和平台局部固定 wrist／palm 锚点，复用 Core Distance Matching 与双骨 IK，使用物理 montage 的同一时钟和角色事务。真实静态三 Hz／单并行／GPU 六项启用支撑控制均通过，移动／高度／支撑中取消与销毁等七项运行／策略通过；5,940 帧身份与各次包／829 载荷完整性保留。候选支撑手腕漂移约 0.0004 mm，但支撑指节仍穿模约 5.11 cm，释放峰值约 9.08 cm，完整蒙皮门禁未过。Release Core／帧交换／零分配／双骨 IK 61/61、Import motion/contact 7/7 和原 hand IK 16/16，Import 相关集 94/99 的 5 个已有摘要失败保留；默认完整 pipeline 已接入 Mantle 接触／蒙皮门禁分派并保留独立检查。当前仍诊断包，下一步修手指接触姿态和释放／提腿几何，重新验收，不将曲线／wrist 固定通过视为全动作通过。见[稳定合同](docs/architecture/als-mantle-contact-control.md)及[本批验证和失败证据](docs/verification/2026-10-09-mantle-contact-progress-curves.md)。
+
+2026-10-09 Mantle 可复用游戏场景：脚本直接运行既有 `mantling_demo_smoke.tscn`，不使用 computer-use。原 v2 的 7/7 仅通过当时的运行／截图采集断言，漏掉朝向和穿模，已由上条纠正。保留 Low 三种物理 Hz、根运动开关、单线程及候选／原版各 60 张 GPU 截图、829 载荷／配置／程序集完整性证据；首轮程序集变更失败仍保留。见[原场景检查记录及纠正](docs/verification/2026-10-09-kimodo-mantle-scene.md)。
+
+2026-10-09 Mantle 游戏测试：应用户要求，默认活动指针切到 Mantle v4 诊断包（四个 Low 替换身份，其余及 High 为原版），保留旧 v2 指针备份；829 个载荷摘要与普通 Demo 无环境覆盖启动通过，已打开真实游戏窗口。人工测试及完整生产验收仍开放，未合并旧 v2 locomotion。见[指针与启动记录](docs/verification/2026-10-09-kimodo-mantle-active-pointer.md)。
+
+2026-10-09 Mantle 朝向检查：源 Hips 与目标 Pelvis 全帧对照未发现固定 90° yaw，Root 分解保留世界姿态、曲线与轨道一致。修复 Viewer 把 component raw 当 FBX 坐标显示，以及离线 ASCII FBX 空块／曲线标签导致缺 Root、零轨道的问题；两种 Low 现为 68 骨、204 轨道、46 关键帧，与 raw 逐键世界位置一致。9 项 Node、8 项 Python、真实 Godot 导入与既有 -90° 模型 presentation、Low 60 Hz 场景通过；不重写资产、不启动 UE、不切活动包。High 源失败与完整矩阵／视觉验收仍开放。见[检查与截图](docs/verification/2026-10-09-kimodo-mantle-orientation.md)和[共同空间契约](docs/architecture/kimodo-viewer-comparison-space.md)。
+
+2026-10-09 Mantle 实际生成：四轮、12 次实际扩散对照，最新 v4 两种 Low 的四个 V4/Refactored 身份通过源/目标门禁、Root/接触曲线及最终 FBX 回读；High 手掌与结束双脚通过，2.433 s 的 Pelvis 路径偏差仍为 16.434 cm，超过原 15 cm 门槛，拒绝交付。补充逐帧 Hips 和最多 0.25 s 间隔的全身条件，修正 High 少一帧；关闭 SDK 后处理对照更差，保留默认原生后处理。177 项 Python 回归、最新 17 项 Mantle 场景通过，实际新 Low 渲染 60 张并有限查看三帧；首轮完整矩阵 69/71，恢复中断与松键渲染仍失败。零交付分支显式受阻，缓存旧 worker 的纯 fallback 验证已作废。179 个非道具身份缺失，包仍诊断，活动 v2 指针保持；下一步解决 High 结束阶段下沉、额外运行失败及人工视觉验收，不能放宽门禁或以参考夹具替代生成。见[稳定合同](docs/architecture/kimodo-mantle-export-policy.md)、[受控验证](docs/verification/2026-10-09-kimodo-mantle-export-policy.md)和[实际生成证据](docs/verification/2026-10-09-kimodo-mantle-generation.md)。
+
+2026-10-09 新攀爬资产合同分析：真实 UE5.8.1 读取 GASP 的 8 个 Sequence、7 个 Montage，确认 Root Motion、`attach`/FrontLedge 三维对齐及相关曲线；当前诊断包 Mantle 存在高度/起点失配、Pelvis Z 残差压平、支撑手语义与接触失配，原曲线时序尚未重新适配。后续先关闭生成接触与 Root/Pelvis 合同，再扩展现有 Core 的 Emote-only Warping 配置。仅资产读取/离线分析，未修复或重新验收。见[分析与数值证据](docs/verification/2026-10-09-mantle-asset-contract-analysis.md)。
+
 2026-10-09 Mantle 朝向／穿模复核：用户指出截图缺陷后，确认 Root 关闭时的 mesh 基底抵消遗漏，已修 Core，真实 Low actor yaw 由约 82.5° 恢复为 0°；四组新增回归旧代码失败、修复后 Mantle Core 33/33 通过。完整蒙皮仍穿模：候选 Root 关闭／开启峰值约 19.63／9.08 cm，原版约 22.33／3.99 cm。复用脚本已增加 actor yaw 和蒙皮／平台交叠门禁，v3 运行及朝向各 7/7、几何 0/7、总结果失败；120 张 GPU 截图、2,700 帧身份和包／829 载荷／配置／程序集完整性均保留。额外 moving／high／cancel／根关闭策略场景通过；Import Mantle 93/98，5 项摘要不匹配失败。保持诊断包与失败证据。下一步修程序化抬升与姿态同步，以及候选释放／提腿阶段的身体避障，随后重做接触和完整矩阵验收。见[修复与实际蒙皮证据](docs/verification/2026-10-09-mantle-runtime-orientation-penetration.md)。
 
 2026-10-09 默认鼠标行为：普通 Demo 启动时保持可见、自由指针，只有主动按 Esc 才捕获；失焦释放实际鼠标模式，回到窗口不自动捕获。优化构建、真实 Godot headless 360 帧键鼠回归与 P3 输入场景通过；未执行图形窗口人工焦点／悬停验收。见[修复与验证](docs/verification/2026-10-09-default-mouse-capture.md)。

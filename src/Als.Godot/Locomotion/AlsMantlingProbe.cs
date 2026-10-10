@@ -4,7 +4,11 @@ using GodotAls.Core.Actions;
 namespace GodotAls.Locomotion;
 
 internal readonly record struct AlsMantlingTarget(CollisionObject3D Body, Transform3D World,
-    bool Relative, float Height, AlsMantlingType Type);
+    bool Relative, float Height, AlsMantlingType Type)
+{
+    public Vector3 LedgePoint { get; init; }
+    public Vector3 LedgeNormal { get; init; }
+}
 
 /// <summary>Main-only translation of AAlsCharacter::StartMantling sweeps.
 /// Visibility blockers use the same explicit static/dynamic/destructible layers
@@ -79,7 +83,8 @@ internal sealed class AlsMantlingProbe
         var targetYaw = MathF.Atan2(-inward.X, -inward.Z);
         target = new(body, new(new Basis(Vector3.Up, targetYaw), center),
             body is AnimatableBody3D or RigidBody3D or CharacterBody3D, height,
-            !grounded ? AlsMantlingType.InAir : height > 125 ? AlsMantlingType.High : AlsMantlingType.Low);
+            !grounded ? AlsMantlingType.InAir : height > 125 ? AlsMantlingType.High : AlsMantlingType.Low)
+            { LedgePoint=new(forward.Point.X,top.Point.Y,forward.Point.Z),LedgeNormal=top.Normal };
         Rejection = "Accepted"; return true;
     }
 

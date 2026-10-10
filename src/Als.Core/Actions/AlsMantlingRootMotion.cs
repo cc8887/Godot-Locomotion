@@ -4,7 +4,12 @@ namespace GodotAls.Core.Actions;
 
 public readonly record struct AlsMantlingWarpSettings(float Duration, float MontageStartTime, float MontageRate,
     float BlendInTime, AlsActionBlendOption BlendInOption, float WarpStart, float WarpEnd,
-    AlsActionBlendOption LocationOption, AlsActionBlendOption RotationOption);
+    AlsActionBlendOption LocationOption, AlsActionBlendOption RotationOption)
+{
+    public float? ProgressLiftStartTime {get;init;}
+    public float? ProgressTargetHeight { get; init; }
+    public float? ProgressPreparationEndTime { get; init; }
+}
 
 // Start/Target have unit scale, as the native source stores only location and rotation.
 // Relative space is selected by the host's actual movement-base policy each frame.
@@ -41,7 +46,7 @@ public static class AlsMantlingRootMotion
         in AlsMantlingWarpSettings settings, in AlsMantlingWarpAnchors anchors,
         in AlsPrecisePose actor, in AlsQuaternion meshRotation, in AlsDoubleVector gravityUp,
         bool targetExists, bool relative, in AlsPrecisePose targetBase,
-        AlsMontageRootTransformSampler rootSampler, bool useRootMotion = true)
+        AlsMontageRootTransformSampler rootSampler, bool useRootMotion = true, AlsMantlingProgressCurve? progress = null)
     {
         Nonnegative(time);Nonnegative(simulationDelta);Nonnegative(delta);
         var nextTime = time + simulationDelta;
@@ -72,7 +77,17 @@ public static class AlsMantlingRootMotion
             start=UnitScale(AlsPrecisePose.Compose(start,targetBase));
             target=UnitScale(AlsPrecisePose.Compose(target,targetBase));
         }
-        var position=start.Position+(target.Position-start.Position)*locationWeight;
+        var displacement=target.Position-start.Position;
+        var position=start.Position+displacement*locationWeight;
+        if(!useRootMotion && progress is not null)
+        {
+            var sample=progress.Sample(montageTime,settings.MontageStartTime,
+                settings.ProgressLiftStartTime ?? settings.MontageStartTime,
+                settings.ProgressTargetHeight, settings.ProgressPreparationEndTime);
+            locationWeight=blend*sample.Planar;var liftWeight=blend*sample.Lift;
+            var vertical=gravityUp*AlsDoubleVector.Dot(gravityUp,displacement);
+            position=start.Position+(displacement-vertical)*locationWeight+vertical*liftWeight;
+        }
         var bias=AlsQuaternion.Dot(start.Rotation,target.Rotation)>=0 ? 1 : -1;
         var rotation=(start.Rotation*(bias*(1.0-rotationWeight))+target.Rotation*rotationWeight).Normalized();
         var projection=gravityUp*AlsDoubleVector.Dot(gravityUp,new(rotation.X,rotation.Y,rotation.Z));

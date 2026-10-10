@@ -59,7 +59,7 @@ def lock_planar_root(raw, skeleton):
 
 
 def decompose(raw, skeleton, *, family, declared_root_motion=False, root_rotation=None,
-              canonical_origin=None, origin_reference=None):
+              canonical_origin=None, origin_reference=None, mantle_root_positions=None):
     """Return an authored-root clip, its ALS view and a reconstruction receipt.
 
     The only intentional body-space change is ONE constant XY translation.
@@ -87,7 +87,14 @@ def decompose(raw, skeleton, *, family, declared_root_motion=False, root_rotatio
     rp = world['root'][1].copy()
     rr = world['root'][0].copy() if root_rotation is None else np.asarray(root_rotation)
     origin = np.zeros(3)
-    if family in POSE_FAMILIES:
+    if family == 'mantle':
+        if mantle_root_positions is None:
+            raise ValueError('Mantle requires an explicit nominal root profile; pelvis XYZ is not a root path')
+        rp = np.asarray(mantle_root_positions, dtype=float).copy()
+        if rp.shape != (count,3) or not np.isfinite(rp).all() or canonical_origin is not None:
+            raise ValueError('Invalid mantle root profile/time domain')
+        method = 'mantle-nominal-reference-XYZ-preserve-pelvis-residual'
+    elif family in POSE_FAMILIES:
         if canonical_origin is not None:
             origin = np.asarray(canonical_origin, dtype=float)
             if origin.shape != (3,) or not np.isfinite(origin).all() or origin[2] != 0:
@@ -102,10 +109,6 @@ def decompose(raw, skeleton, *, family, declared_root_motion=False, root_rotatio
             in_place=family in ('gait_cycle', 'sprint_start') and not declared_root_motion)
         origin[:2] = trajectory[0] - ref_position[:2]
         rp[:, :2] = trajectory - origin[:2]
-    if family == 'mantle':
-        # Height ownership is an existing mantle contract, independent of XY.
-        # Assign from the reference, rather than adding planar travel twice.
-        rp[:, 2] = ref_position[2] + world['pelvis'][1][:, 2] - world['pelvis'][1][0, 2]
     def assign(name, r, p, s):
         track = tracks[name]
         track['positions'] = p.tolist(); track['rotations'] = Rotation.from_matrix(r).as_quat().tolist()

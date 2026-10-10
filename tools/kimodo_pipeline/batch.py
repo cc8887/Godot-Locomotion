@@ -53,7 +53,7 @@ def run_batch(runner, targets):
                     evidence=next((e.get('evidence') for e in reversed(runner.events) if e.get('node',key)==key and e['status']=='failed'),None))
                 print('REJECTED', key, str(error)[:300], flush=True)
             save('running')
-            if node['op'] in ('generate', 'gait_cycle'):
+            if node['op'] in ('generate', 'gait_cycle', 'mantle'):
                 register('running')
         result = save('authoring_rejected' if any(s['status'] in ('failed','blocked') for s in states.values()) else 'authoring_complete')
         register(result['status'])

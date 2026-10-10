@@ -13,6 +13,16 @@
 
 整个转换不启动 UE，不依赖 UE/Blender/FBX SDK。已有 UE 原生转换入口仍可用于历史取证；离线回读记为 `offline-ufbx-readback-verified`，不能冒充 UE DataModel 原生回读。
 
+## Mantle 控制资源与消费能力
+
+含生成 Mantle 的包在最终姿态／Root 配置写入后，必须烘焙并登记 `config/refactored_mantle_contacts.json`。其中 High 的 `advanceCm` 按实际目标蒙皮与台沿模板延后身体前移，独立于 `liftCm`、固定双手锚点和支撑权重；它不会改写 FBX 的 Root/Pelvis。Root sidecar、最终 FBX 回读或中间 `contact-curves.json` 均不能替代该交付。
+
+Pipeline 的运行验收依赖导入项目具备相应消费能力：读取选中包控制文件，核对最终输入摘要／sequence／原采样时间，将修正后的前移和独立抬升绑定到 montage，并按支撑权重处理平台局部手部锚点。当前 Godot ALS 已通过 Import／Core／Godot 三层执行此路径；完整接触模式缺失曲线时报错。其他消费项目必须实现等价能力或明确标为不支持，不能把普通 FBX 导入成功视为曲线接入成功。
+
+正式发布要求曲线随包交付、记录载荷摘要，并在启用前重新烘焙比较最终输入；诊断补烘焙不改变生产资格。算法、字段、Root 开关及 Import 不独立重算几何的边界见[双向交付契约](als-mantle-contact-control.md#pipeline-与导入项目的双向交付契约)。
+
+运行前另执行 `mantle-curve-semantics-v1` 检查，保留独立原始 Root 前移、检查真实前移平台段及包／控制文件能力声明一致。当前只支持高度入口匹配，前移是时间驱动；持续距离驱动播放和 Root Motion Warping 不得声明已实现。失败保存 `runtime-result.json` 并阻止启动，成功保存 `mantle-curve-contract.json`；此检查不能替代后续实际场景和正式启用的几何复核。旧包若没有新合同，需从对应最终输入构建新版本，不在活动包上补字段。见[曲线用途及门禁](als-mantle-contact-control.md#distance-matching-与-motion-warping-的导出判断)。
+
 ## 完整执行和质量验收
 
 完成转换不等于动作质量合格。角度重定向保留骨长，已支持的平脚周期追加接触 IK，但支撑接触、步幅、脚部朝向和最终蒙皮仍须独立验收。目标检查或修复失败时，诊断包保留失败和未应用修复状态。检查器未支持的身份标为分析失败，不能当作通过。

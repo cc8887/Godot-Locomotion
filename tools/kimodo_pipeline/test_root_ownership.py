@@ -92,15 +92,22 @@ class RootOwnershipTests(unittest.TestCase):
             np.testing.assert_allclose(after[helper][1],after[body][1],atol=1e-10)
             np.testing.assert_allclose(after[helper][0],after[body][0],atol=1e-12)
 
-    def test_mantle_height_does_not_add_planar_travel_twice(self):
+    def test_mantle_nominal_root_preserves_vertical_pelvis_residual_and_fk(self):
         raw,skel=fixture(4);track(raw,'root')['positions']=[[i*10,0,0] for i in range(4)]
         track(raw,'pelvis')['positions']=[[100,0,90+i*20] for i in range(4)]
         before=world_pose(raw,skel)
-        authored,runtime,report=decompose(raw,skel,family='mantle')
+        path=np.array([[i*10,0,i*15] for i in range(4)])
+        authored,runtime,report=decompose(raw,skel,family='mantle',mantle_root_positions=path)
         after=world_pose(authored,skel)
-        np.testing.assert_allclose(after['root'][1],[[i*10,0,i*20] for i in range(4)])
-        np.testing.assert_allclose(after['pelvis'][1],before['pelvis'][1]-[100,0,0])
+        np.testing.assert_allclose(after['root'][1],path)
+        np.testing.assert_allclose(after['pelvis'][1],before['pelvis'][1])
+        np.testing.assert_allclose(np.asarray(track(authored,'pelvis')['positions'])[:,2],[90,95,100,105])
         self.assertEqual(authored,runtime)
+
+    def test_mantle_cannot_infer_nominal_root_from_all_pelvis_xyz(self):
+        raw,skel=fixture()
+        with self.assertRaisesRegex(ValueError,'explicit nominal root'):
+            decompose(raw,skel,family='mantle')
 
     def test_discrete_pose_keys_are_not_interpreted_as_a_motion_path(self):
         raw,skel=fixture(4);track(raw,'pelvis')['positions']=[[0,0,90],[10,0,70],[-10,10,60],[0,20,80]]

@@ -45,6 +45,8 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
             var floor = world.GetNode<StaticBody3D>("StartFloor");
             floor.GetNode<CollisionShape3D>("CollisionShape3D").Transform = Transform3D.Identity;
             _height = _case is "low" or "torch" or "box" ? 1 : 1.8f;
+            if(args.FirstOrDefault(a=>a.StartsWith("--mantle-height=")) is {} heightArg)
+                _height=float.Parse(heightArg[16..],System.Globalization.CultureInfo.InvariantCulture);
             _obstacle = Box(world, "MantleTarget", new(-4, _height / 2, -2.1f), new(4, _height, 3), _case == "moving");
             if (_case == "fast") _obstacle.ConstantLinearVelocity = new(.2f, 0, 0);
             _obstacle.CollisionLayer = 0;
@@ -90,7 +92,9 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
                 if (character.LatestMotorInput.CurrentDriveMode != AlsDriveMode.AnimationDriven) throw new Exception("Mantle lost physical drive.");
                 if (_case == "moving" && character.LatestMotorInput.MantleProbe.PlatformId < 0)
                     throw new Exception("Moving mantle target lost its published identity.");
-                if (mantle.Type != (_case == "air" ? AlsMantlingType.InAir : _height == 1 ? AlsMantlingType.Low : AlsMantlingType.High))
+                // The probe measures from the swept capsule bottom, slightly
+                // below the floor. A 1.25 m fixture measures about 126.9 cm.
+                if (mantle.Type != (_case == "air" ? AlsMantlingType.InAir : _height < 1.25f ? AlsMantlingType.Low : AlsMantlingType.High))
                     throw new Exception("Wrong native height/mode selection.");
                 if (_active > 1 && motor.GlobalPosition.DistanceTo(_last) > .5f) throw new Exception("Discontinuous mantle root motion.");
             }
@@ -102,11 +106,24 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
                 foreach (var name in new[]{"root","pelvis","spine_03","hand_l","hand_r","foot_l","foot_r"})
                 {
                     var bone=skeleton.FindBone(name);var pose=skeleton.GetBoneGlobalPose(bone);
-                    bones[name]=new {world=V(skeleton.GlobalTransform*pose.Origin),rotation=Q((skeleton.GlobalBasis*pose.Basis).GetRotationQuaternion())};
+                    var worldPose=skeleton.GlobalTransform*pose;
+                    bones[name]=new {world=V(worldPose.Origin),rotation=Q(worldPose.Basis.GetRotationQuaternion()),
+                        platformLocal=GodotObject.IsInstanceValid(_obstacle) ? V(_obstacle.GlobalTransform.AffineInverse()*worldPose.Origin) : V(worldPose.Origin)};
                 }
                 var penetration=GodotObject.IsInstanceValid(_obstacle) ? _geometry!.CaptureVolumePenetration(
                     _obstacle.GlobalTransform,new Aabb(new Vector3(-2,-_height/2,-1.5f),new Vector3(4,_height,3))) : default;
-                _frames.Add(new {tick=_tick,time=mantle.Time,active=mantle.Active,actor=V(motor.GlobalPosition),
+                var contacts=character.FullMovementDiagnostics.MantleContacts;
+                _frames.Add(new {tick=_tick,time=mantle.Time,startTime=mantle.StartTime,rate=mantle.Rate,
+                    montageTime=mantle.StartTime+mantle.Time*mantle.Rate,montage=motor.MantlingMontage,
+                    advanceProgress=motor.MantlingProgress.Planar,liftProgress=motor.MantlingProgress.Lift,
+                    contactControl=GodotAls.Animation.AlsAnimationRuntimeOptions.MantleContactControl,
+                    handContacts=new {contacts.Applied,contacts.Time,contacts.LeftWeight,contacts.RightWeight,contacts.ResidualCm,
+                        contacts.RequestedCorrectionCm,contacts.ReachExcessCm,
+                        leftAnchor=Anchor(contacts.Applied ? contacts.LeftWorld : GodotAls.Core.Locomotion.AlsPrecisePose.Identity),
+                        rightAnchor=Anchor(contacts.Applied ? contacts.RightWorld : GodotAls.Core.Locomotion.AlsPrecisePose.Identity)},
+                    contactBase=new {position=mantle.ContactBase.Position,rotation=mantle.ContactBase.Rotation},
+                    mesh=new {position=V(skeleton.GlobalPosition),rotation=Q(skeleton.GlobalBasis.GetRotationQuaternion())},
+                    active=mantle.Active,actor=V(motor.GlobalPosition),
                     actorYaw= motor.GlobalBasis.GetEuler().Y,committed=character.RuntimeCommittedFrameId,
                     presented=character.PublishedFrameId,bones,penetration=new {penetration.Vertices,penetration.Inside,
                         penetration.MaximumDepthMeters,deepestWorld=V(penetration.DeepestWorld),penetration.DominantBone}});
@@ -152,12 +169,22 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
     }
     private static float[] V(Vector3 v)=>[v.X,v.Y,v.Z];
     private static float[] Q(Quaternion q)=>[q.X,q.Y,q.Z,q.W];
+    private static object Anchor(GodotAls.Core.Locomotion.AlsPrecisePose p)
+    {
+        // The desired rotation still carries native bone axes. Final displayed
+        // bones carry FBX axes, unlike an actor's world rotation.
+        var q=new System.Numerics.Quaternion((float)-p.Rotation.Y,(float)-p.Rotation.Z,(float)p.Rotation.X,(float)p.Rotation.W)*
+            GodotAls.Core.Locomotion.AlsFootIkCoordinates.FbxToGodotRotation;
+        return new {world=new[]{p.Position.Y*.01,p.Position.Z*.01,-p.Position.X*.01},rotation=new[]{q.X,q.Y,q.Z,q.W}};
+    }
     private void SaveReport()
     {
         if (_output is null) return;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_output))!);
         File.WriteAllText(_output,System.Text.Json.JsonSerializer.Serialize(new {schemaVersion=1,scenario=_case,hz=_hz,
             rootMotion=GodotAls.Animation.AlsAnimationRuntimeOptions.SampleRootMotion,
+            progressControl=GodotAls.Animation.AlsAnimationRuntimeOptions.MantleProgressControl,
+            fixtureHeightMeters=_height,
             scope="Published physical bones and full skin vertices against the fixture box",frames=_frames}));
     }
     private void Fail(Exception e) { _done = true; SaveReport(); GD.PushError(e.ToString()); GetTree().Quit(1); }

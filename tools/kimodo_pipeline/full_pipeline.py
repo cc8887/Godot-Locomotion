@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime
 from .graph import read_json
 from .runner import write_json, file_hash
-from .publish import ROOT, finalize_requests
+from .publish import ROOT, finalize_requests, validate_mantle_curve_delivery
 
 
 def verify_runtime(pack, output, godot, dotnet, python):
@@ -14,12 +14,23 @@ def verify_runtime(pack, output, godot, dotnet, python):
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=True)
     report=output/'runtime-result.json'
     if report.exists():raise ValueError('Runtime evidence already exists; use a fresh output directory')
+    selected=read_json(pack)
+    if selected.get('targetMantleChecks') or selected.get('mantleCurveContract'):
+        try:
+            assessment=validate_mantle_curve_delivery(pack,selected)
+        except (ValueError, KeyError, TypeError) as error:
+            write_json(report,dict(status='runtime_failed',pack=str(pack),productionReady=False,activated=False,
+                checks=[dict(name='mantle-curve-contract',passed=False,reason=str(error))]))
+            raise ValueError('Mantle curve contract preflight failed; evidence: '+str(report)) from error
+        write_json(output/'mantle-curve-contract.json',assessment)
     resource='res://'+Path(pack).resolve().relative_to(ROOT).as_posix()
     env=os.environ.copy()
     for key in ('ALS_ASSET_ROOT','ALS_RAW_SOURCE_GENERATED_DIR','ALS_REQUIRE_KIMODO_SOURCE'):
         env.pop(key,None)
     env['ALS_RESOURCE_PACK_PATH']=resource
     checks=[]
+    if selected.get('targetMantleChecks') or selected.get('mantleCurveContract'):
+        checks.append(dict(name='mantle-curve-contract',passed=True,report=str(output/'mantle-curve-contract.json')))
     def update_viewer():
         from .viewer_pack import export_pack
         provenance=Path(pack).parent/'pipeline-provenance.json'
@@ -61,6 +72,14 @@ def verify_runtime(pack, output, godot, dotnet, python):
             '--output',matrix,'--godot',godot,'--headless-fixed-fps','60']
         if read_json(pack).get('missingNonPropSources'):matrix_command.append('--diagnostic-partial-pack')
         run('e2e-matrix',matrix_command,marker='ALS_NON_PROP_E2E_OK',timeout=7200)
+        if read_json(pack).get('targetMantleChecks'):
+            # Gameplay completion alone does not certify hand contact or skin.
+            # Retain failures and still execute the independent platform cases.
+            run('mantle-contact-static',[python,ROOT/'scripts/verify-kimodo-mantle-scene.py',
+                '--pack',resource,'--output',output/'mantle-contact-static','--godot',godot],
+                marker='KIMODO_MANTLE_SCENE_OK',timeout=2400)
+            run('mantle-contact-platforms',[python,ROOT/'scripts/verify-mantle-contact-cases.py',
+                '--pack',resource,'--output',output/'mantle-contact-platforms','--godot',godot],timeout=2400)
     else:
         checks.append(dict(name='e2e-matrix',passed=False,status='blocked',reason='Godot build/import failed'))
     result=dict(status='runtime_passed' if all(c['passed'] for c in checks) else 'runtime_failed',
@@ -81,6 +100,17 @@ def complete_run(runner, authoring_result, *, pack=None, godot=None, dotnet=None
     assets=[dict(node=k,identity=r['identity'],outputs=r['outputs']) for k,r in runner.results.items() if r['op']=='deliver']
     bundle_path=output/'authoring-bundle.json'
     write_json(bundle_path,dict(assets=assets,productionReady=False,status=authoring_result['status']))
+    if not assets:
+        # With no accepted generated sources, a native-only fallback pack
+        # cannot supply evidence about the failed generation. Keep the source
+        # receipts and explicitly block export/runtime instead of reporting
+        # vacuous zero-asset FBX success and running native fallback scenes.
+        result=dict(authoring=authoring_result,status='pipeline_complete_rejected',
+            activated=False,productionReady=False,failedPhase='source-quality',
+            sourceDeliveries=0,evidence=str(output),
+            remainingStageStatus='blocked: no accepted generated source deliveries')
+        write_json(output/'result.json',result)
+        return result
     deps=Path(deps or ROOT/'artifacts/kimodo_als/offline-python-deps')
     sys.path.insert(0,str(deps));sys.path.insert(0,str(runner.repo))
     pack=Path(pack or ROOT/'assets/generated'/('als_nonprop_'+stamp))
@@ -98,7 +128,8 @@ def complete_run(runner, authoring_result, *, pack=None, godot=None, dotnet=None
         write_json(output/'result.json',result)
         return result
     accepted=(authoring_result['status']=='authoring_complete' and runtime['status']=='runtime_passed' and
-        conversion['sourceClosureComplete'] and not conversion['failedTargetGaits'] and conversion['finalFbxReadback']['passed'])
+        conversion['sourceClosureComplete'] and not conversion['failedTargetGaits'] and
+        not conversion['failedTargetMantles'] and conversion['finalFbxReadback']['passed'])
     result=dict(authoring=authoring_result,conversion=conversion,runtime=runtime,
         status='pipeline_complete' if accepted else 'pipeline_complete_rejected',activated=False)
     write_json(output/'result.json',result)

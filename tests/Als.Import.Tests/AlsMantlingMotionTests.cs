@@ -12,9 +12,44 @@ namespace GodotAls.Import.Tests;
 public sealed class AlsMantlingMotionTests(ITestOutputHelper output)
 {
     private static string Read(string name)=>File.ReadAllText(Path.Combine(RepositoryRoot.Find(),"assets/config/"+name+".json"));
-    private static AlsMantlingMotionProfile Profile()=>AlsMantlingMotionCompiler.Compile(Read("refactored_mantle_inputs"),
-        Read("refactored_mantle_root_tracks"),Read("refactored_mantle_blends"));
+    private static AlsMantlingMotionProfile Profile(bool progress=false)=>AlsMantlingMotionCompiler.Compile(Read("refactored_mantle_inputs"),
+        Read("refactored_mantle_root_tracks"),Read("refactored_mantle_blends"),progress);
     private static float F(JsonNode row,string key)=>row[key]!.GetValue<float>();
+    [Theory]
+    [InlineData(AlsMantlingType.Low,75)]
+    [InlineData(AlsMantlingType.High,150)]
+    public void ContactAwareHeightEntryRetainsApproachForTheBodyBlend(AlsMantlingType type,float height)
+    {
+        var original=Profile(true).Select(type,"Als.OverlayMode.Default");
+        var approach=type==AlsMantlingType.Low ? 10/30f : 17/30f;
+        var definition=original with {ContactApproachStartTime=approach};
+        var settings=definition.CreateProgressSettings(height);
+        Assert.True(original.CreateProgressSettings(height).MontageStartTime>settings.MontageStartTime);
+        Assert.True(settings.MontageStartTime+definition.BlendInTime*definition.Settings.RateScale<=approach+1e-6);
+        Assert.Equal(original.Progress!.MatchStartTime(height),settings.ProgressLiftStartTime);
+        Assert.Equal(height,settings.ProgressTargetHeight);
+        Assert.Equal(MathF.Min(approach,settings.MontageStartTime+definition.BlendInTime*definition.Settings.RateScale),
+            settings.ProgressPreparationEndTime);
+        Assert.Null(definition.CreateWarpSettings(height,30).ProgressTargetHeight);
+        var phase=MathF.Max(approach,settings.ProgressLiftStartTime!.Value);
+        Assert.Equal(original.Progress.Sample(phase,settings.ProgressLiftStartTime.Value).Lift,
+            definition.Progress!.Sample(phase,settings.MontageStartTime,settings.ProgressLiftStartTime.Value).Lift);
+        Assert.Equal(new AlsMantlingProgressSample(0,0),definition.Progress!.Sample(settings.MontageStartTime,settings.MontageStartTime));
+        Assert.Equal(new AlsMantlingProgressSample(1,1),definition.Progress.Sample(definition.Settings.MontageLength,settings.MontageStartTime));
+        Assert.Equal(original.CreateWarpSettings(height,30),definition.CreateWarpSettings(height,30));
+    }
+    [Fact]
+    public void HalfHeightEntryMatchesRemainingLiftInsteadOfLinearHeightTimeMapping()
+    {
+        var profile=Profile(true);var definition=profile.Select(AlsMantlingType.Low,"Als.OverlayMode.Default");
+        var settings=definition.CreateProgressSettings(50);
+        var remaining=definition.Roots.SampleLast().Position.Z-definition.Roots.Sample(settings.MontageStartTime).Position.Z;
+        Assert.InRange(remaining,49.99,50.01);
+        Assert.NotEqual(definition.CreateWarpSettings(50,30,false).MontageStartTime,settings.MontageStartTime);
+        var progress=definition.Progress!;
+        Assert.Equal(new AlsMantlingProgressSample(0,0),progress.Sample(settings.MontageStartTime,settings.MontageStartTime));
+        Assert.Equal(new AlsMantlingProgressSample(1,1),progress.Sample(definition.Settings.MontageLength,settings.MontageStartTime));
+    }
     private static AlsPrecisePose Pose(JsonNode row)
     {
         double[] V(string key)=>row[key]!.AsArray().Select(x=>x!.GetValue<double>()).ToArray();

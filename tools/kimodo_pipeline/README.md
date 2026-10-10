@@ -1,6 +1,18 @@
 # ALS 资源生产依赖图
 
+Mantle 在 `publish stage` 中额外烘焙逐 sequence 的前移／抬升、剩余高度、双手独立接触权重、固定 ledge 局部 wrist 位置和 palm 朝向，并登记配置 payload。High 的前移按最终目标蒙皮与台沿模板延后，避免身体尚未越过台面就前移；它保留原落点，不改写 Root/Pelvis。具体计算与配套消费要求见[固定支撑及双向交付契约](../../docs/architecture/als-mantle-contact-control.md)。
+
+**生产端必须导出，导入项目必须识别。** 正式包交付 `config/refactored_mantle_contacts.json` 并登记文件 SHA256；导入项目须核对版本、最终姿态／Root 摘要、sequence 和时间轴，实际应用其中的 `advanceCm`、独立抬升及手部接触控制。只交付／导入 FBX 或 Root sidecar 不满足此合同。当前 Godot ALS 通过 `AlsMantlingDemoResources` → `AlsMantlingContactCompiler` → Core 进度／手部控制消费；其他项目需实现等价路径或显式报告不支持，不能以普通动画导入成功代替曲线验收。
+
+导出自动写入 `mantle-curve-semantics-v1`：键值中的 `rootAdvanceCm` 独立保留修正前 Root 前移，`advanceCm` 用作时间驱动的避障控制；`curveAnalysis` 记录前移平台段，`curveContract`／包的 `mantleCurveContract` 声明实际用途和消费要求。当前高度入口匹配为 true，持续距离驱动播放、整段前移距离反查和 Root Motion Warping／窗口导出为 false。烘焙、stage、正式启用和完整运行前均校验，错误声明或把避障值冒充原始距离会失败；运行前保留失败证据。仅有非递减曲线不能证明完整 Distance Matching／Warping 已实现。见[固化判断与数据契约](../../docs/architecture/als-mantle-contact-control.md#distance-matching-与-motion-warping-的导出判断)。旧包继续保持原字节，新 Pipeline 要求新版本合同。
+
+既有诊断包可用 `python -m tools.kimodo_pipeline.mantle_contacts --config <选中包/config>` 补烘焙到按输入 SHA 命名的独立目录，不重写动画／FBX／包清单；原版对照需同时对 `assets/config` 烘焙。完整接触路径优先读取包内曲线，再查匹配摘要的补烘焙；均缺失或数据不匹配时失败。诊断补烘焙不能代替正式随包交付。
+
+完整 pipeline 对含生成 Mantle 的包，在通用 E2E 后自动运行静态支撑／全蒙皮以及高度／移动平台／支撑中取消与销毁矩阵。接触失败或全蒙皮超过原 2 cm 门槛都会纳入 `runtime_failed`，前一矩阵失败仍继续执行后一矩阵。实际生成包的通过范围和剩余失败见[中高攀爬验证](../../docs/verification/2026-10-10-medium-high-mantle.md)；不能以 gameplay 落台或手腕固定宣称资产验收通过。
+
 入口为 `tools/produce_als_resources.py`。默认使用当前逐资产 contracts 和 `directional_gait_rules.json` 的非道具范围；底层 `production_rules.json` 描述两套 ALS 的 253 个动画身份、共享 139 个语义母动作。它生成可执行作者流程，而不是只记录生成任务的清单。
+
+Mantle 使用独立接触策略：约束抓沿手的位置/掌向与结束双脚支撑，执行作者及目标两级有界 IK/门禁，Root 保持名义 approach/lift 路径并保留 Pelvis 残余。`run --scope mantle --keep-going` 运行六个 V4/Refactored 身份的完整转换/FBX/Godot 管线；部分包保持诊断状态。见[算法和导出合同](../../docs/architecture/kimodo-mantle-export-policy.md)。
 
 ```mermaid
 flowchart TD
@@ -209,6 +221,8 @@ Sprint/Weapon Start 的非循环起步片段也服务原地 motor。DAG 的 `in_
 
 ## Low Mantle 可复用真实场景诊断
 
+Mantle 在目标腕部矫正后自动执行 `mantle_hand_repair.py`：实际目标蒙皮驱动有界指节优化，以及接近／释放的双骨 IK，再进行 Root/Pelvis 分解、控制曲线烘焙和最终 FBX 回读。详见[稳定修复合同](../../docs/architecture/kimodo-mantle-hand-skin-repair.md)。它不会替换生成动作的躯干、腿或 Root/Pelvis；新增回归可运行 `python -m unittest tools.kimodo_pipeline.test_mantle_hand_repair`，需要现有原始 mesh、候选输入及隔离的 ufbx 依赖。
+
 Low Mantle 的局部真实场景诊断可直接执行 `scripts/verify-kimodo-mantle-scene.py`：
 
 ```powershell
@@ -217,7 +231,7 @@ Low Mantle 的局部真实场景诊断可直接执行 `scripts/verify-kimodo-man
   --output artifacts/tests/<fresh-run>/mantle-scene
 ```
 
-先完成项目构建和 Godot 资源导入；脚本复用 `mantling_demo_smoke.tscn` 的完整 Demo、真实物理、Montage 与最终骨架写入，覆盖 Low 三种物理 Hz、根运动开关、单线程和候选／原版 GPU 截图，不依赖 computer-use。各进程显式选择包，证据目录不得复用，保存命令／日志／胶囊方向／截图摘要，并核对整批载荷、活动指针和动画设置未变。
+先完成项目构建、Godot 资源导入、P2B 编译及运行绑定导出；脚本复用 `mantling_demo_smoke.tscn` 的完整 Demo、真实物理、Montage 与最终骨架写入，覆盖两种实际 Low 选择的左右支撑手与三种物理 Hz、根运动开关、单线程和候选两侧／原版 GPU 截图，不依赖 computer-use。各进程显式选择包，证据目录不得复用，保存命令／日志／胶囊方向／截图摘要，并核对整批载荷、活动指针和动画设置未变。
 
 场景通过 `--mantle-output=<path>` 输出逐帧 actor 位置／yaw、已发布物理骨骼、committed/presented 身份和完整蒙皮顶点与已知平台箱体的交叠深度。脚本分别保存 `runtimePassed`、`quality.orientationPassed` 和 `quality.skinPassed`；静态平台 actor yaw 偏差上限 1°，蒙皮箱体交叠深度上限 2 cm。后一项是新增夹具几何门禁，不是放宽既有原生接触对照。任何失败均返回非零，原版对照也照实保留失败，不能因为原版也穿模而将候选判为通过。它不替代 High、完整矩阵、全部身份、支撑力／手掌朝向或人工验收；当前仍失败的结果见[复核记录](../../docs/verification/2026-10-09-mantle-runtime-orientation-penetration.md)。
 

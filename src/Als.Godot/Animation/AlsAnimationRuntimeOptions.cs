@@ -24,6 +24,8 @@ internal static class AlsAnimationRuntimeOptions
     internal static bool RootMotionEnabled => RootMotionSetting.Value;
     // Native diagnostic entries keep their authored sampling unless explicitly overridden.
     internal static bool SampleRootMotion => _sampleRootMotion ??= (!_demoConfigured && !OS.GetCmdlineUserArgs().Any(a => a is "--enable-root-motion" or "--disable-root-motion") || RootMotionEnabled);
+    internal static bool MantleProgressControl => !SampleRootMotion && !Has("--mantle-legacy-linear");
+    internal static bool MantleContactControl => MantleProgressControl && !Has("--mantle-no-hand-lock");
     private static readonly string[] CompleteDemoFlags =
     [
         "--layered-frame", "--foot-ik-frame", "--based-foot-lock",

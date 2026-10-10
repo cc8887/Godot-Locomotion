@@ -3,6 +3,15 @@
 ## 从哪里开始
 
 - [代理工作约束](../AGENTS.md)：工作目录、修改边界、架构与验证原则。
+- [中高攀爬生成与实际游戏验证](verification/2026-10-10-medium-high-mantle.md)：生成 High／两 Low、目标蒙皮控制曲线、实际高度准备段补偿和可复用 Godot 高度／帧率／渲染检查。
+- [Kimodo Mantle 生成与导出](architecture/kimodo-mantle-export-policy.md)及[本批验证](verification/2026-10-09-kimodo-mantle-export-policy.md)：按动作类型分派手部/脚部条件、有界接触 IK、Root/Pelvis 特化和逐资产门禁。
+- [Mantle 实际生成](verification/2026-10-09-kimodo-mantle-generation.md)：四轮真实扩散对照、Low 部分交付、High 路径拒绝及完整转换/运行证据。
+- [Mantle 朝向与 Viewer 播放检查](verification/2026-10-09-kimodo-mantle-orientation.md)：纯脚本全帧方向／Root 曲线、component 与 FBX 手性、真实 Three.js 播放修复及 Godot 模型相对旋转对照。
+- [Mantle 默认活动指针与游戏启动](verification/2026-10-09-kimodo-mantle-active-pointer.md)：用户选择 Mantle v4 诊断包、四个 Low 替换身份及普通 Demo 真实启动。
+- [Mantle 可复用真实场景验证](verification/2026-10-09-kimodo-mantle-scene.md)：直接运行测试场景，Low 三种物理 Hz／根运动开关／单线程、候选与原版 GPU 截图及程序集完整性；不依赖 computer-use。
+- [Mantle 固定支撑曲线与双向交付合同](architecture/als-mantle-contact-control.md)与[曲线接触验证](verification/2026-10-09-mantle-contact-progress-curves.md)：目标蒙皮避障前移的计算、Pipeline 必须导出与 Godot ALS 必须消费的字段／身份／时间轴契约，平台局部锚点驱动同一事务的手臂 IK。
+- [Mantle 曲线用途与能力门禁](verification/2026-10-10-mantle-curve-semantics-gates.md)：独立原始距离、避障曲线平台段和已实现模式声明，防止误称完整 Distance Matching／Motion Warping；实际导出及 .NET Import 对照。
+- [Mantle 生产后手部蒙皮修复](architecture/kimodo-mantle-hand-skin-repair.md)与[实际导入／游戏验证](verification/2026-10-10-mantle-hand-skin-repair.md)：目标指节优化、接近／释放双骨 IK、最终 FBX 回读和两侧支撑手的真实 Godot 场景。
 - [Mantle 运行时朝向与穿模复核](verification/2026-10-09-mantle-runtime-orientation-penetration.md)：修复 Root 关闭时的 mesh 基底抵消遗漏，逐帧 actor／完整蒙皮与平台检查，保留仍失败的接触质量证据。
 - [当前实施路线](../ROADMAP.md)：当前目标、优先级、开放项与证据链接。先读当前目标，再按任务定位相关章节；历史阶段记录中的“下一步”不代表当前安排。
 - [架构文档](architecture/)：长期设计、模块职责、接口及生命周期契约。按本次涉及的模块查阅。

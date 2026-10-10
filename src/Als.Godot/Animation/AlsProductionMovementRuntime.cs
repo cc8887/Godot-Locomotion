@@ -10,9 +10,17 @@ using NQuaternion = System.Numerics.Quaternion;
 
 namespace GodotAls.Animation;
 
+internal readonly record struct AlsMantlingContactDiagnostics(bool Applied,float Time,float LeftWeight,float RightWeight,
+    double ResidualCm,AlsPrecisePose LeftWorld,AlsPrecisePose RightWorld)
+{
+    public double RequestedCorrectionCm {get;init;}
+    public double ReachExcessCm {get;init;}
+}
+
 internal readonly record struct AlsFullMovementDiagnostics(AlsFrameIdentity Identity, AlsAnimationInputFeedback Feedback,
     AlsGroundedAnimationInput Ground, AlsInAirAnimationInput Global, AlsGraphTraversalCounter Evaluation, int MovementState)
 {
+    public AlsMantlingContactDiagnostics MantleContacts {get;init;}
     public AlsFrameIdentity RootIdentity { get; init; }
     public AlsBinaryBlendState RootState { get; init; }
     public AlsRagdollFrameDiagnostics Ragdoll { get; init; }
@@ -114,6 +122,12 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     private readonly AlsStandingCycleGraph _standing;
     private readonly AlsMovementGraphDefinition _definition;
     private readonly Skeleton3D _skeleton;
+    private readonly AlsMantlingHandSolver? _mantleHands;
+    private readonly AlsLocalPose[] _mantleContactPose;
+    private readonly AlsPrecisePose _skeletonToComponent;
+    private AlsLocalPose _candidateComponent;
+    private bool _mantleContactEvaluated;
+    private AlsMantlingContactDiagnostics _candidateMantleContacts,_committedMantleContacts;
     private readonly Node3D _component;
     private readonly long _attachParent;
     private readonly NVector3 _animatedSpeeds;
@@ -193,6 +207,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             RefactoredMotionHistory = _base.RefactoredStances?.CommittedMotionHistory ?? default,
             RefactoredLocomotionFrames = _base.RefactoredStances?.CommittedLocomotionFrames ?? 0,
             RefactoredSourceNotifyReferences = _base.CommittedOriginalNotifyReferences,
+            MantleContacts=_committedMantleContacts,
             RefactoredLayeringFrames = _layered?.RefactoredLayeringFrames ?? 0,
             LegacyMovementUpdates = _base.LegacyMovementUpdates,
             UsesRefactoredLocomotion = _base.RefactoredStances is not null,
@@ -241,6 +256,10 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         if (AlsAnimationRuntimeOptions.Has("--based-foot-lock") && !AlsAnimationRuntimeOptions.Has("--foot-ik-frame"))
             throw new ArgumentException("Based foot locking requires --foot-ik-frame.");
         _component = (Node3D)library.Root; _animatedSpeeds = animatedSpeeds;
+        var skeletonOffset=_component.GlobalTransform.AffineInverse()*_skeleton.GlobalTransform;
+        _skeletonToComponent=new(new(skeletonOffset.Origin.X,skeletonOffset.Origin.Y,skeletonOffset.Origin.Z),
+            new(skeletonOffset.Basis.GetRotationQuaternion().X,skeletonOffset.Basis.GetRotationQuaternion().Y,
+                skeletonOffset.Basis.GetRotationQuaternion().Z,skeletonOffset.Basis.GetRotationQuaternion().W),new(skeletonOffset.Basis.Scale.X,skeletonOffset.Basis.Scale.Y,skeletonOffset.Basis.Scale.Z));
         _attachParent = checked((long)_component.GetParent().GetInstanceId());
         _turnProfiles = pose.Turns.ToDictionary(turn => turn.AnimationId);
         if (definition.Sources.RuntimeStamp==definition.OverlaySharedSources.Sources.RuntimeStamp ||
@@ -269,6 +288,12 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             .Select(b => Array.IndexOf(_godotToLogical, b.ParentLogicalId)).ToArray();
         _rollbackPose = new AlsLocalPose[_skeleton.GetBoneCount()];
         _candidateAnimationPose = new AlsLocalPose[_logicalBoneCount];
+        _mantleContactPose = new AlsLocalPose[_logicalBoneCount];
+        if(AlsAnimationRuntimeOptions.MantleContactControl)
+        {
+            var contactSkeleton=definition.OverlayRawSources.GetSkeleton(pose.SkeletonId);
+            _mantleHands=new(contactSkeleton.LogicalBoneNames,contactSkeleton.LogicalParents);
+        }
         _committedAnimationPose = new AlsLocalPose[_logicalBoneCount];
         _leftIk = CurveNames.IndexOf(splitFeet ? "FootLeftIk" : "Enable_FootIK_L");
         _rightIk = CurveNames.IndexOf(splitFeet ? "FootRightIk" : "Enable_FootIK_R");
@@ -312,7 +337,8 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             throw new ArgumentException("Production movement requires character rotation before animation gathering.");
         if (_layered is null && input.Command.RequestedOverlay != AlsOverlayKind.Default)
             throw new InvalidOperationException("Non-default Overlay requires the layered animation owner.");
-        _identity = input.Identity;
+        _identity = input.Identity; _candidateComponent=AlsPrecisePose.Compose(_skeletonToComponent,new(componentPose)).ToSingle();
+        _mantleContactEvaluated=false; _candidateMantleContacts=default;
         _nextEvaluation = _evaluation.Next(checked((ulong)input.Identity.FrameId));
         var movement = _standing.CreateMovementInput(input);
         var rules = new AlsGroundedRuleInput(movement.ShouldMove, false, false, result.ActualStance,
@@ -381,6 +407,16 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
 
     private void CompleteEvaluation()
     {
+        if(_mantleHands is not null && _base.TryMantleContacts(out var left,out var right,out var ledge,out var weight,out var sampleTime))
+        {
+            _mantleHands.Evaluate(_layered is null ? _base.Pose : _layered.Pose,_mantleContactPose,
+                _candidateComponent,ledge,left,right,weight);
+            _mantleContactEvaluated=true;
+            _candidateMantleContacts=new(true,sampleTime,weight>AlsPoseBlender.WeightThreshold ? left.Weight : 0,
+                weight>AlsPoseBlender.WeightThreshold ? right.Weight : 0,_mantleHands.MaximumResidualCm,
+                AlsPrecisePose.Compose(left.LedgeAnchor,ledge),AlsPrecisePose.Compose(right.LedgeAnchor,ledge))
+            {RequestedCorrectionCm=_mantleHands.MaximumRequestedCorrectionCm,ReachExcessCm=_mantleHands.MaximumReachExcessCm};
+        }
         if(_nextGraphCapture is { } graphCapture)
         {
             graphCapture.Row["pose"]=AlsFullGraphParityCapture.Pose(_layered!.Pose);
@@ -505,7 +541,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         for (var bone = 0; bone < _rollbackPose.Length; bone++) _rollbackPose[bone] = ReadBone(bone);
         try
         {
-            var pose = _layered is null ? _base.Pose : _layered.Pose;
+            var pose = _mantleContactEvaluated ? _mantleContactPose : _layered is null ? _base.Pose : _layered.Pose;
             pose.CopyTo(_candidateAnimationPose);
             WriteLogicalPose(pose); _applied = true;
         }
@@ -531,6 +567,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         _overlayOverride = _nextOverlayOverride;
         _candidateAnimationPose.AsSpan().CopyTo(_committedAnimationPose);
         _committedAnimationIdentity = _identity;
+        _committedMantleContacts=_candidateMantleContacts;
     }
     public void Discard()
     {

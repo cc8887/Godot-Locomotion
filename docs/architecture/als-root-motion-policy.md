@@ -12,11 +12,11 @@
 
 关闭时，float/double 原始姿态采样器直接用根骨骼参考变换，跳过动画 root 轨道，之后再构建组件空间和 virtual bones。目标适配后仍使用目标参考 root；作者 ForceRootLock/首帧 root lock 不会恢复动画位移。骨盆和四肢继续按相同时刻采样，加法参考遵循相同策略。Core、Import 原生读者的可选参数默认保持 `true`，Godot 普通 ALS 显式传入策略。
 
-关闭时不创建 Montage 根轨迹采样库，不提取或提交根运动增量；事件、通知、播放时间和角色提交/取消事务仍使用既有时钟。普通行走由输入/物理 motor 移动。动作玩法状态仍启用：翻滚的蹲伏/朝向和硬落地自动 Ragdoll 不依赖根运动开关；翻滚动画产生的根位移须开启策略。翻越关闭时不读取根轨迹或由其寻找起始高度，使用既有高度参考时间映射、平台目标和 correction/location/rotation 插值完成程序化移动；开启时恢复根轨迹驱动的原路径。
+关闭时不创建 Montage 根运动增量采样库，不提取或提交根运动增量；事件、通知、播放时间和角色提交/取消事务仍使用既有时钟。普通行走由输入/物理 motor 移动。动作玩法状态仍启用：翻滚的蹲伏/朝向和硬落地自动 Ragdoll 不依赖根运动开关；翻滚动画产生的根位移须开启策略。Mantle 现在消费最终 Root 轨迹离线烘焙的独立前移／抬升及剩余高度控制曲线，按剩余高度寻找起始 pose，再根据平台目标程序化移动；每帧不读取动画 Root 变换、不提取增量。固定平台局部手部锚点与接触权重控制同一最终姿态事务内的 Core IK。未使用专门接触控制的诊断路径可以启动时从轨迹配置编译进度缓冲。`--mantle-legacy-linear` 保留旧高度参考时间映射及统一线性移动负对照；开启 Root 时恢复原轨迹驱动路径。详见[固定支撑合同](als-mantle-contact-control.md)。
 
 普通 Demo 的完整链在两种根策略下均启用 `--rolling-gameplay`，开启根策略时额外启用 `--montage-root-motion`；显式 `--action-preview` 仍表达动画预览意图。配置不是运行中热切换，不另建角色时钟、独立求值或最终写骨掩盖路径。
 
-翻越锚点始终包含原生 mesh 相对 actor 的 −90° 基底。关闭作者 Root 采样只将 Root 变换替换为 identity；`Prepare` 仍必须通过 `Reverse(mesh, identity)` 抵消锚点基底，不能将整个 mesh→actor 变换删去，否则输出角色额外偏转 90°。此抵消不读取动画 Root。关闭策略下的程序化目标插值不保证恢复资产的接触轨迹，完整落台不能替代最终蒙皮与障碍交叠检查；当前失败证据见[朝向与穿模复核](../verification/2026-10-09-mantle-runtime-orientation-penetration.md)。
+翻越锚点始终包含原生 mesh 相对 actor 的 −90° 基底。关闭作者 Root 采样只将 Root 变换替换为 identity；`Prepare` 仍必须通过 `Reverse(mesh, identity)` 抵消锚点基底，不能将整个 mesh→actor 变换删去，否则输出角色额外偏转 90°。此抵消不读取动画 Root。新增接触控制也不能以完整落台或支撑 wrist 固定替代最终蒙皮与障碍交叠检查；原失败证据见[朝向与穿模复核](../verification/2026-10-09-mantle-runtime-orientation-penetration.md)，本批进度与接触结果见[实际验证](../verification/2026-10-09-mantle-contact-progress-curves.md)。
 
 ## 生产契约
 
@@ -51,6 +51,6 @@ schema 1 保留最终目标的采样帧数、播放长度、frameRate 分子/分
 
 旋转动作可有零距离和非零角度。纯竖直翻越的距离参考应取三维或 Z 通道。`signedDistanceToEndCm` 表示剩余轨迹路程的负值，不是到目标点的带符号欧氏距离。原地段可能出现重复距离键；后续 Distance Matching 的逆查找需要明确处理这些区间。
 
-文件同时记录 BVH 字节哈希、原生 raw 字节哈希和完整最终 raw 的规范 JSON 语义哈希。哈希用于追溯对应采样姿态，独立于运行开关。当前提供可用于迁移的轨迹数据，尚未实现 Distance Matching 播放控制、距离反查或状态切换算法。
+文件同时记录 BVH 字节哈希、原生 raw 字节哈希和完整最终 raw 的规范 JSON 语义哈希。哈希用于追溯对应采样姿态，独立于运行开关。Mantle 专用控制已使用剩余高度反查起始 pose；本通用 root-motion 文件尚未接入普通 locomotion 的 Distance Matching 播放／状态切换。
 
 已发布包可用 `publish bake-root-curves` 补齐曲线：先验证既有全部 payload 和原生回执，读取最终 raw（未在运行 bank 使用的 V4 身份从同一原生回执适配），写独立文件并原子更新包清单。不会重写动画和配置资源字节。入口与命令见 [生产脚本说明](../../tools/kimodo_pipeline/README.md)，本批实测见 [验证记录](../verification/2026-10-07-als-root-motion-policy-and-distance-curves.md)。

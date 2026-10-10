@@ -152,6 +152,10 @@ class Runner:
         if node['op']=='rig' and self.repo and not binding:
             identity['rigAssets']={str(p.relative_to(self.repo)):file_hash(p) for directory in ('somaskel30','somaskel77')
                                    for p in (self.repo/'kimodo/assets/skeletons'/directory).glob('*') if p.is_file()}
+        if node['op']=='native_mantle_reference' or node['params'].get('contract',{}).get('family')=='mantle':
+            from .mantle import reference_input
+            _,_,reference_identity=reference_input(node['params'].get('semantic') or node['params']['contract']['semanticName'])
+            identity['nativeMantleInputs']=reference_identity
         if node['op']=='native_gait_reference':
             from .als_reference import original_input
             index=Path(node['params']['indexPath'])
@@ -240,6 +244,14 @@ class Runner:
             m.save_motion(folder/'motion.npz',motion,rig)
             write_json(folder/'bound-input.json',{'path':binding['path'],'sha256':file_hash(binding['path'])});return
         if op=='external':raise ValueError(f'Unbound authoring input {node["id"]}: {p["reason"]}')
+        if op=='native_mantle_reference':
+            from .mantle import native_reference
+            index=Path(p['indexPath'])
+            if not index.is_absolute():index=Path(__file__).resolve().parents[2]/index
+            motion,receipt=native_reference(p['semantic'],rig,index)
+            m.save_motion(folder/'motion.npz',motion,rig)
+            write_json(folder/'constraint-reference.json',receipt)
+            return
         if op=='native_gait_reference':
             from .als_reference import native_gait_reference
             index=Path(p['indexPath'])
@@ -250,7 +262,11 @@ class Runner:
             return
         if op=='generate':
             if not self.repo:raise ValueError('Generation requires --kimodo-repo')
-            if p.get('gaitReference'):
+            if p.get('mantleReference'):
+                from .mantle import materialize_constraints
+                constraints,constraint_receipt=materialize_constraints(p,self.motion(p['mantleReference']),rig)
+                write_json(folder/'mantle-constraints.json',constraint_receipt)
+            elif p.get('gaitReference'):
                 from .gait_constraints import materialize_gait_constraints,GaitConstraintError
                 try:
                     constraints, constraint_receipt=materialize_gait_constraints(p,self.motion(p['gaitReference']),rig)
@@ -266,6 +282,8 @@ class Runner:
                   '--duration',str(p['seconds']),'--seed',str(p['seed']),
                   '--diffusion_steps',str(p['steps']),'--constraints',str(folder/'constraints.json'),
                   '--output',str(folder/'generated')]
+            if p.get('postProcessing',True) is False:
+                args.append('--no-postprocess')
             env=self.backend_env.copy();env.setdefault('TEXT_ENCODER_DEVICE','cpu')
             env.update(LOCAL_CACHE='True',HF_HUB_OFFLINE='1',TEXT_ENCODER_MODE='local',TEXT_ENCODER='llm2vec')
             # The cache identity hashes the resolved HF snapshots, so don't allow
@@ -302,7 +320,7 @@ class Runner:
                     constraints_lst=load_constraints_lst(str(folder/'constraints.json'),model.skeleton)
                     output=model([p['prompt']],[int(p['seconds']*p['fps'])],constraint_lst=constraints_lst,
                                  num_denoising_steps=p['steps'],num_samples=1,multi_prompt=True,
-                                 num_transition_frames=5,post_processing=True,return_numpy=True)
+                                 num_transition_frames=5,post_processing=p.get('postProcessing',True),return_numpy=True)
                     sample={k:(v[0] if hasattr(v,'shape') and len(v.shape)>0 and v.shape[0]==1 else v) for k,v in output.items()}
                     save_kimodo_npz(str(folder/'generated.npz'),sample)
             else:
@@ -313,7 +331,20 @@ class Runner:
             if len(motion['root_positions'])!=int(p['seconds']*p['fps']):raise ValueError('Kimodo frame count/FPS differs from plan')
             m.save_motion(folder/'motion.npz',motion,rig)
             write_json(folder/'generation-settings.json',p);return
-        if op=='rest':
+        if op=='mantle':
+            from .mantle import author,MantleError,POLICY
+            if p['policy']!=POLICY:raise ValueError('Unknown mantle policy')
+            source_outputs=self.output_of(p['source'])
+            if 'constraint-reference.json' in source_outputs:
+                raise ValueError('Constraint-only mantle reference cannot become a delivery')
+            try:
+                motion,receipt=author(self.motion(p['source']),self.motion(p['reference']),rig,p['semantic'])
+            except MantleError as error:
+                write_json(folder/'mantle-validation.json',error.receipt)
+                raise
+            receipt['sourceMotionSha256']=source_outputs['motion.npz']['sha256']
+            write_json(folder/'mantle-validation.json',receipt)
+        elif op=='rest':
             if 'standardTPoseGlobalRotations' not in rig:raise ValueError('T pose requires rig rest-basis conversion, not identity native rotations')
             global_rot=np.asarray(rig['standardTPoseGlobalRotations'])[None]
             motion=m.complete(m.local_from_global(global_rot,rig['parents']),np.zeros((1,3)),rig)
@@ -427,6 +458,18 @@ class Runner:
                     if not read_json(upper['path'])['passed']:
                         raise ValueError('Gait delivery requires passing Idle-relative upper-body validation')
                     asset_metadata['upperBodyValidationReceipt']=dict(file=upper['path'],sha256=upper['sha256'])
+            if row['family']=='mantle':
+                outputs=self.output_of(p['source']);gate=outputs.get('mantle-validation.json')
+                if gate is None:raise ValueError('Mantle delivery requires an executed authoring gate')
+                receipt=read_json(gate['path']);source_motion=self.motion(p['source'])
+                if (not receipt['passed'] or receipt['sampledKeyCount']!=timing['sampledKeyCount'] or
+                    receipt['fps']!=float(motion['fps']) or
+                    not np.allclose(motion['local_rot_mats'],source_motion['local_rot_mats'],atol=1e-12,rtol=0) or
+                    not np.array_equal(motion['root_positions'],source_motion['root_positions'])):
+                    raise ValueError('Mantle delivery altered validated motion/time domain')
+                asset_metadata['mantleValidationReceipt']=dict(file=gate['path'],sha256=gate['sha256'],
+                    sourceMotionFile=outputs['motion.npz']['path'],sourceMotionSha256=outputs['motion.npz']['sha256'])
+                asset_metadata['note']='Generated mantle pose in validated native time domain; native PoseStanding/PoseGrounded semantics retained; contact metadata and root curves are authored on the target.'
             if p['base']:m.save_motion(folder/'additive-reference-full-pose.npz',self.motion(p['base']),rig)
         else:raise ValueError(f'Unknown operation {op}')
         if op in ('gait_cycle', 'mirror'):
@@ -448,6 +491,8 @@ class Runner:
         if op=='deliver':
             if 'gaitValidationReceipt' in asset_metadata:
                 asset_metadata['gaitValidationReceipt']['deliveredMotionSha256']=file_hash(folder/'motion.npz')
+            if 'mantleValidationReceipt' in asset_metadata:
+                asset_metadata['mantleValidationReceipt']['deliveredMotionSha256']=file_hash(folder/'motion.npz')
             write_json(folder/'asset.json',asset_metadata)
         if op=='deliver' and self.repo:
             import torch

@@ -62,9 +62,9 @@ def convert_bundle(authoring, receipts_path, output, pack, *, batch_id=None, res
                 bvhPath=outputs['motion.bvh']['path'],bvhSha256=outputs['motion.bvh']['sha256'],
                 raw=str(raw_path),rawSha256=file_hash(raw_path),fbx=str(fbx),fbxSha256=file_hash(fbx),
                 retargetedAssetPath='offline:'+node,targetPlanarOrigin=target_origin_reference(contract,contracts))
-            for key in ('gaitValidationReceipt','authoringTrajectory','upperBodyValidationReceipt'):
+            for key in ('gaitValidationReceipt','authoringTrajectory','upperBodyValidationReceipt','mantleValidationReceipt'):
                 if metadata.get(key):j[key]=metadata[key]
-            for key in ('targetGaitPolicy','targetCleanup'):
+            for key in ('targetGaitPolicy','targetCleanup','targetMantlePolicy'):
                 if contract.get(key):j[key]=contract[key]
             jobs.append(j)
             print('CONVERTED',node,flush=True)
@@ -121,6 +121,7 @@ def convert_bundle(authoring, receipts_path, output, pack, *, batch_id=None, res
         converted=len(jobs),sourceClosureComplete=staged['sourceClosureComplete'],
         missing=len(staged['missingNonPropSources']),finalFbxReadback=staged['offlineFbxReadback'],
         failedTargetGaits=[c for c in staged['targetGaitChecks'] if not c['passed']],viewer=viewer,
+        failedTargetMantles=[c for c in staged.get('targetMantleChecks',[]) if not c['passed']],
         rootMotionCurves=len(staged['rootMotionCurves']),extractedRootMotionCurves=len(staged['extractedRootMotionCurves']))
     write_json(output/'pipeline-result.json',result)
     return result

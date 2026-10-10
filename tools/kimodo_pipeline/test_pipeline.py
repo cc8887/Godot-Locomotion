@@ -147,7 +147,7 @@ class GraphTests(unittest.TestCase):
 
     def test_right_variants_no_inference_and_inverse_stance(self):
         nodes=self.graph['nodes']
-        for name in ('Walk_Right_Forward','Run_Right_Forward','Jump_Run_Right','Turn_90_Right','Mantle_Low_Right'):
+        for name in ('Walk_Right_Forward','Run_Right_Forward','Jump_Run_Right','Turn_90_Right'):
             self.assertEqual('mirror',nodes['motion:'+name]['op'])
             self.assertNotIn('candidate:'+name,nodes)
         self.assertEqual('reverse',nodes['motion:CrouchToStand']['op'])

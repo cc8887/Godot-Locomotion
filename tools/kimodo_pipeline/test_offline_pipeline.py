@@ -107,6 +107,23 @@ class OfflineFbxTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'Incomplete native retarget closure'):
                 stage(bundle,ROOT/'assets/generated/als_nonprop_unittest_never_created')
 
+    def test_zero_deliveries_cannot_validate_native_fallback_as_generated(self):
+        from .full_pipeline import complete_run
+        with tempfile.TemporaryDirectory() as directory:
+            folder=Path(directory)
+            runner=SimpleNamespace(output=folder/'run',repo=folder,python=sys.executable,
+                results={'candidate:mantle':dict(op='generate',identity='rejected-source',outputs={})})
+            runner.output.mkdir();pack=folder/'pack'
+            with patch('tools.kimodo_pipeline.offline_pipeline.convert_bundle') as converted, \
+                 patch('tools.kimodo_pipeline.full_pipeline.verify_runtime') as runtime:
+                result=complete_run(runner,dict(status='authoring_rejected'),pack=pack)
+            converted.assert_not_called();runtime.assert_not_called()
+            self.assertEqual(result['sourceDeliveries'],0)
+            self.assertEqual(result['failedPhase'],'source-quality')
+            self.assertEqual(result['status'],'pipeline_complete_rejected')
+            self.assertFalse(pack.exists())
+            self.assertTrue((runner.output/'full-pipeline/authoring-bundle.json').is_file())
+
     def test_rejected_authoring_still_converts_and_runs_runtime(self):
         from .full_pipeline import complete_run
         with tempfile.TemporaryDirectory() as directory:
@@ -125,6 +142,31 @@ class OfflineFbxTests(unittest.TestCase):
                 result=complete_run(runner,dict(status='authoring_rejected'),pack=pack,godot='godot',dotnet='dotnet')
             self.assertEqual(1,converted.call_count);self.assertEqual(1,runtime.call_count)
             self.assertEqual('pipeline_complete_rejected',result['status']);self.assertFalse(result['activated'])
+
+    def test_skin_rejection_blocks_runtime_acceptance_after_gameplay_pass_and_keeps_platform_check(self):
+        from .full_pipeline import verify_runtime
+        with tempfile.TemporaryDirectory(dir=ROOT/'artifacts') as directory:
+            folder=Path(directory);pack=folder/'resource-pack.json'
+            pack.write_text(json.dumps(dict(targetMantleChecks=[dict(source='generated-low')])))
+            markers='P2B_IMPORT_OK RAW_SOURCE_REQUEST_OK ALS_NON_PROP_E2E_OK'
+            commands=[]
+            def process(command,**kwargs):
+                commands.append(command)
+                rejected=any('verify-kimodo-mantle-scene.py' in str(c) for c in command)
+                kwargs['stdout'].write('KIMODO_MANTLE_SCENE_FAILED: published skin exceeds 2cm' if rejected else markers)
+                return SimpleNamespace(returncode=1 if rejected else 0)
+            with patch('tools.kimodo_pipeline.full_pipeline.subprocess.run',side_effect=process), \
+                 patch('tools.kimodo_pipeline.full_pipeline.finalize_requests'), \
+                 patch('tools.kimodo_pipeline.full_pipeline.validate_mantle_curve_delivery',
+                       return_value=dict(passed=True,policy='mantle-curve-semantics-v1')) as contract_check, \
+                 patch('tools.kimodo_pipeline.viewer_pack.export_pack',return_value={}):
+                result=verify_runtime(pack,folder/'runtime','godot','dotnet',sys.executable)
+            contract_check.assert_called_once()
+            self.assertTrue(next(c for c in result['checks'] if c['name']=='mantle-curve-contract')['passed'])
+            self.assertEqual('runtime_failed',result['status']);self.assertFalse(result['productionReady'])
+            self.assertTrue(next(c for c in result['checks'] if c['name']=='e2e-matrix')['passed'])
+            self.assertFalse(next(c for c in result['checks'] if c['name']=='mantle-contact-static')['passed'])
+            self.assertTrue(any('verify-mantle-contact-cases.py' in str(c) for command in commands for c in command))
 
 
 if __name__=='__main__':unittest.main()

@@ -12,11 +12,27 @@ internal sealed partial class AlsBaseLayerFrameRuntime
     private readonly AlsMantlingBranchingRuntime? _mantleBranches;
     private readonly AlsMontageSlotPose? _mantleSlot;
     private readonly IAlsMontagePoseSource? _mantlePose;
+    private readonly IReadOnlyDictionary<int,AlsMantlingContactCurve>? _mantleContactCurves;
     private AlsMantlingFrame _committedMantling, _candidateMantling;
     private long _committedMantleInstance, _candidateMantleInstance;
     private AlsMantlingBranchInputs _committedMantleInputs = new(false, "", "", ""), _candidateMantleInputs;
     private bool _locomotionUpdated;
     private bool _committedMantleEnded, _candidateMantleEnded;
+
+    internal bool TryMantleContacts(out AlsMantlingHandContact left,out AlsMantlingHandContact right,
+        out AlsPrecisePose ledge,out float weight,out float sampleTime)
+    {
+        left=right=default;ledge=AlsPrecisePose.Identity;weight=sampleTime=0;
+        if(!_candidateMantling.Active||!_candidateMantling.HasContactBase||_mantleContactCurves is null||_cancelForRuntimeFailure) return false;
+        foreach(var entry in _montages.Frame.Evaluations)
+        {
+            if(entry.InstanceId!=_candidateMantleInstance||entry.Slot!=AlsMontageSlot.PostLocomotion) continue;
+            var curve=_mantleContactCurves[entry.ActionDefinitionId];
+            left=curve.Sample(entry.Position,true);right=curve.Sample(entry.Position,false);
+            ledge=_candidateMantling.ContactBase;weight=entry.Weight;sampleTime=entry.Position;return left.Weight>0||right.Weight>0;
+        }
+        return false;
+    }
 
     private bool MantlePhysicalActionEnded()
     {
@@ -53,7 +69,8 @@ internal sealed partial class AlsBaseLayerFrameRuntime
         {
             if (_mantleHost is null || !frame.Mantling.Active) throw new InvalidOperationException("Unbound mantle gameplay request.");
             var definition = _mantleHost.ActionIds[frame.Mantling.DefinitionId];
-            if (!_montages.PlayAction(definition, 1)) throw new InvalidOperationException("Mantle montage is absent from the physical bank.");
+            if (!_montages.PlayAction(definition, 1, _mantleContactCurves is null ? 0 : frame.Mantling.StartTime))
+                throw new InvalidOperationException("Mantle montage is absent from the physical bank.");
             _candidateMantleInstance = _montages.ActiveActionInstance(definition);
         }
         if (_committedMantling.Active && (frame.Mantling.Interrupted || _cancelForRuntimeFailure))

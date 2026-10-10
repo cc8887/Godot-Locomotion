@@ -13,6 +13,7 @@ internal readonly record struct AlsMotorMantlingState(AlsMantlingFrame Frame, Co
     public Transform3D Destination { get; init; }
     public bool PreventAutoRestart { get; init; }
     public Vector3 ActorScale { get; init; }
+    public AlsPrecisePose ContactBase { get; init; }
 }
 
 public partial class AlsCharacterMotor
@@ -23,12 +24,18 @@ public partial class AlsCharacterMotor
     internal bool MantlingEndedByAnimation { get; set; }
     internal bool MantleTargetDestroyed { get; private set; }
     internal AlsMantlingFrame Mantling => _mantling.Frame;
+    internal string MantlingMontage => _mantling.Motion?.Settings.Montage ?? "";
+    internal AlsMantlingProgressSample MantlingProgress => MantleProgressControl && _mantling.Motion?.Progress is {} progress
+        ? progress.Sample(_mantling.Settings.MontageStartTime+_mantling.Frame.Time*_mantling.Settings.MontageRate,
+            _mantling.Settings.MontageStartTime,_mantling.Settings.ProgressLiftStartTime ?? _mantling.Settings.MontageStartTime,
+            _mantling.Settings.ProgressTargetHeight, _mantling.Settings.ProgressPreparationEndTime) : default;
     internal string MantleProbeRejection => _mantleProbe?.Rejection ?? "Disabled";
     private Transform3D MantleDestination => _mantling.Relative && GodotObject.IsInstanceValid(_mantling.Target)
         ? _mantling.Target!.GlobalTransform * _mantling.Destination : _mantling.Destination;
     internal void CancelMantling() { _mantling = default; MantleTargetDestroyed = false; }
     // Native mannequin base rotation offset (mesh faces +Y, actor faces +X).
     private static readonly AlsQuaternion MantleMeshRotation = new(0, 0, -Math.Sqrt(.5), Math.Sqrt(.5));
+    private static bool MantleProgressControl => AlsAnimationRuntimeOptions.MantleProgressControl;
 
     private bool StepMantling(bool grounded, in AlsResolvedLocomotionCommand command, AlsOverlayKind overlayKind, bool blocked, bool cancel,
         in AlsActionRequest request, float delta)
@@ -48,13 +55,15 @@ public partial class AlsCharacterMotor
             }
             var step = AlsMantlingRootMotion.Prepare(state.Frame.Time, delta, delta, state.Settings, state.Anchors,
                 NativeActor(GlobalTransform), MantleMeshRotation, new(0, 0, 1), true, state.Relative,
-                NativeActor(state.Target!.GlobalTransform), state.Motion!.Roots, AlsAnimationRuntimeOptions.SampleRootMotion);
+                NativeActor(state.Target!.GlobalTransform), state.Motion!.Roots, AlsAnimationRuntimeOptions.SampleRootMotion,
+                MantleProgressControl ? state.Motion.Progress : null);
             // ALS PhysCustom explicitly uses MoveUpdatedComponent(..., false).
             // All clearance tests happened before starting the action.
             var actor = FromNativeActor(step.TargetActor);
             actor.Basis = actor.Basis.ScaledLocal(state.ActorScale); GlobalTransform = actor;
             Velocity = new((float)(step.Velocity.Y * .01), (float)(step.Velocity.Z * .01), (float)(-step.Velocity.X * .01));
-            _mantling = state with { Frame = state.Frame with { Time = step.Time, Started = false } };
+            _mantling = state with { Frame = state.Frame with { Time = step.Time, Started = false,
+                ContactBase=state.Relative ? AlsPrecisePose.Compose(state.ContactBase,NativeActor(state.Target!.GlobalTransform)) : state.ContactBase } };
             return true;
         }
         _mantling = state with { Frame = state.Frame with { Started = false, Interrupted = false },
@@ -69,16 +78,22 @@ public partial class AlsCharacterMotor
         var motion = _mantleResources!.Motion.Select(target.Type, overlay);
         var montage = _mantleResources.Montages.Definitions[motion.Settings.Montage];
         var pose = _mantleResources.Montages.Poses[montage.SequencePath];
-        var settings = motion.CreateWarpSettings(target.Height, (double)pose.Data.FrameRateNumerator / pose.Data.FrameRateDenominator, AlsAnimationRuntimeOptions.SampleRootMotion);
+        var settings = !AlsAnimationRuntimeOptions.SampleRootMotion && MantleProgressControl
+            ? motion.CreateProgressSettings(target.Height)
+            : motion.CreateWarpSettings(target.Height, (double)pose.Data.FrameRateNumerator / pose.Data.FrameRateDenominator, AlsAnimationRuntimeOptions.SampleRootMotion);
         var targetBase = NativeActor(target.Body.GlobalTransform);
         var desired = NativeActor(target.World);
         if (target.Relative) desired = AlsPrecisePose.Relative(desired, targetBase);
         var anchors = AlsMantlingRootMotion.CreateAnchors(NativeActor(GlobalTransform), desired, MantleMeshRotation,
             AlsAnimationRuntimeOptions.SampleRootMotion ? motion.Roots.Sample(settings.MontageStartTime) : AlsPrecisePose.Identity,
             AlsAnimationRuntimeOptions.SampleRootMotion ? motion.Roots.Sample(motion.Settings.MontageLength) : AlsPrecisePose.Identity, target.Relative, targetBase);
+        var contactBase=NativeActor(new(new Basis(new Quaternion(Vector3.Up,target.LedgeNormal))*target.World.Basis,target.LedgePoint));
+        contactBase=contactBase with {Rotation=contactBase.Rotation*MantleMeshRotation,Scale=new(scale.X,scale.Y,scale.Z)};
         _mantling = new(new(true, true, false, montage.Asset.ActionDefinitionId, 0, settings.MontageStartTime,
-            settings.MontageRate, target.Height, target.Type), target.Body, target.Relative, settings, anchors, motion)
-        { Destination = target.Relative ? target.Body.GlobalTransform.AffineInverse() * target.World : target.World, ActorScale = scale };
+            settings.MontageRate, target.Height, target.Type) {HasContactBase=AlsAnimationRuntimeOptions.MantleContactControl,ContactBase=contactBase},
+            target.Body, target.Relative, settings, anchors, motion)
+        { Destination = target.Relative ? target.Body.GlobalTransform.AffineInverse() * target.World : target.World, ActorScale = scale,
+            ContactBase=target.Relative ? AlsPrecisePose.Relative(contactBase,targetBase) : contactBase };
         Velocity = Vector3.Zero; return true;
     }
 

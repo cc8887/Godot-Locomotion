@@ -7,8 +7,13 @@ public readonly record struct AlsMontagePositionOverride(long InstanceId, float 
 public readonly record struct AlsMantlingFrame(bool Active, bool Started, bool Interrupted,
     int DefinitionId, float Time, float StartTime, float Rate, float Height, AlsMantlingType Type)
 {
+    // Native world axes/cm. The movement owner transports this immutable
+    // ledge frame from the same platform-local anchor captured at action start.
+    public bool HasContactBase { get; init; }
+    public GodotAls.Core.Locomotion.AlsPrecisePose ContactBase { get; init; }
     public void Validate()
     {
+        if (HasContactBase) ContactBase.Validate();
         if (Started && !Active || Active && (Interrupted || DefinitionId < 0 || !float.IsFinite(Time) || Time < 0 ||
             !float.IsFinite(StartTime) || StartTime < 0 || !float.IsFinite(Rate) || Rate <= 0 ||
             !float.IsFinite(Height) || Height <= 0 || Type is < AlsMantlingType.High or > AlsMantlingType.InAir))

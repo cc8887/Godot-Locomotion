@@ -175,7 +175,7 @@ def build_graph(contracts, rules):
         # Right variants are derived, never separate random samples.
         left = name.replace('Right', 'Left')
         mirrored = left != name and left in by_name and family in {
-            'gait_cycle', 'jump', 'turn', 'rotate', 'foot_transition', 'mantle', 'gait_pose'}
+            'gait_cycle', 'jump', 'turn', 'rotate', 'foot_transition', 'gait_pose'}
         if family=='gait_pose':
             parent_name=name.removesuffix('_Pose')
             if parent_name not in by_name:parent_name+='_Forward'
@@ -185,6 +185,24 @@ def build_graph(contracts, rules):
                 source=motion(left), base=exact_base or base,
                 mask='legs' if 'Rifle' in name else 'all',
                 repairDerived=bool(gait_closure.get(left,{}).get('repairMirroredCycle',False)))
+        elif family == 'mantle':
+            from .mantle import profile, INDEX, POLICY
+            spec = profile(name)
+            native = 'reference:' + name + ':native-mantle'
+            add(native, 'native_mantle_reference', ['rig:soma'], indexPath=INDEX, semantic=name)
+            candidate = 'candidate:' + name
+            # No dependency on the generated Stand pose, no fixed-height end
+            # stand pin and no gait mirror/loop operation for contact actions.
+            hands = 'both hands' if len(spec['hands']) == 2 else spec['hands'][0] + ' hand'
+            prompt = ('A person mantles onto a ' + ('high' if 'High' in name else 'low') +
+                ' ledge, planting ' + hands + ' on the top surface, palms down and fingers forward. '
+                'Keep the supporting palms fixed while pulling and pushing the body up, '
+                'then release the hands and finish standing with both feet on the ledge.')
+            generate(candidate, row, [native], [], prompt=prompt,
+                     duration=max(2., row['originalTiming']['sampledKeyCount']/rules['fps']), path=None)
+            nodes[candidate]['params']['mantleReference'] = native
+            add(key, 'mantle', ['rig:soma', candidate, native], source=candidate,
+                reference=native, semantic=name, policy=POLICY)
         elif name in programmatic:
             add(key,'mirror',['rig:soma',motion(programmatic[name]),base],
                 source=motion(programmatic[name]),base=base,mask='all',reverseTime=True,
@@ -329,10 +347,6 @@ def build_graph(contracts, rules):
                 # tumble with almost zero net actor displacement after extraction.
                 path={'kind':'linear','velocity':rules.get('rollTravelMeters',1.8)/(rules['candidateSeconds']-1/rules['fps']),
                       'direction':[0,1],'headingDegrees':0}
-            if family=='mantle':
-                path={'kind':'linear','velocity':.6/(rules['candidateSeconds']-1/rules['fps']),
-                      'direction':[0,1],'headingDegrees':0,
-                      'endHeightMeters':2 if 'High' in name else 1}
             if family in ('fall', 'flail'):
                 anchors = []
             candidate = f'candidate:{name}'
@@ -411,6 +425,9 @@ def build_graph(contracts, rules):
 
     for row in rows:
         name = row['semanticName']; source = motion(name); ev = row['originalEvaluation']
+        if row['family'] == 'mantle':
+            from .mantle import POLICY
+            row = dict(row, targetMantlePolicy=POLICY)
         closure_name = name if name in gait_closure else name.replace('Right', 'Left')
         if closure_name in gait_closure and row['family'] != 'gait_pose':
             row = dict(row, targetGaitPolicy='als-forward-v1')

@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--python',type=Path)
     parser.add_argument('--bindings',type=Path,help='Node id -> approved source path (relative to this JSON)')
     parser.add_argument('--target',action='append',help='Exact node id; includes all transitive prerequisites')
-    parser.add_argument('--scope',choices=('all','non-prop'),default='non-prop',help='Keep equipment and prop animation identities out of replacement')
+    parser.add_argument('--scope',choices=('all','non-prop','mantle'),default='non-prop',help='Non-prop closure, mantle-only full-pipeline batch, or explicit diagnostic nodes')
     parser.add_argument('--keep-going',action='store_true',help='Attempt independent branches; failed prerequisites still block dependents')
     parser.add_argument('--authoring-only',action='store_true',help='Explicit diagnostic exception: stop before conversion/runtime')
     parser.add_argument('--pack-output',type=Path)
@@ -31,10 +31,13 @@ def main():
     parser.add_argument('--offline-deps',type=Path,default=ROOT/'artifacts/kimodo_als/offline-python-deps')
     args=parser.parse_args()
     graph=build_graph(read_json(args.contracts),load_rules(args.rules))
-    if args.scope=='non-prop':
+    if args.scope in ('non-prop','mantle'):
         from tools.kimodo_pipeline.scope import non_prop_targets
-        if args.target:raise ValueError('Use either --scope non-prop or explicit --target')
+        if args.target:raise ValueError('Use either a named scope or explicit --target')
         args.target=non_prop_targets(read_json(args.contracts))
+        if args.scope=='mantle':
+            args.target=[key for key in args.target if graph['nodes'][key]['params']['contract']['family']=='mantle']
+            if not args.target:raise ValueError('No mantle assets in the selected non-prop contract')
     order=topological_order(graph['nodes'],args.target)
     if args.command=='inspect':
         print(json.dumps({'summary':graph['summary'],'selectedOrder':order,
@@ -51,7 +54,7 @@ def main():
         path.write_text(json.dumps(requests,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
         print(json.dumps({'inputs':len(requests),'path':str(path)},ensure_ascii=False));return
     if not args.authoring_only:
-        if args.scope!='non-prop':parser.error('Full pipeline requires --scope non-prop; partial graph diagnostics use --authoring-only')
+        if args.scope not in ('non-prop','mantle'):parser.error('Full pipeline requires --scope non-prop or mantle; explicit graph diagnostics use --authoring-only')
         if not args.kimodo_repo:parser.error('Full pipeline requires --kimodo-repo')
         for path in (args.godot,args.dotnet,args.offline_deps/'ufbx/__init__.py'):
             if not path.is_file():parser.error('Full-pipeline dependency missing: '+str(path))

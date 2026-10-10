@@ -230,6 +230,8 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
         {
             _mantleResources = AlsMantlingDemoResources.Shared.Value;
             _mantleHost = new(_mantleResources.Montages, set, definition.AuthoredMontageAssets, definition.TurnMontageAssets, definition.GroundedTransitionAssets);
+            if(_mantleResources.Contacts is {} contacts)
+                _mantleContactCurves=_mantleHost.Profile.Definitions.Values.ToDictionary(d=>d.Asset.ActionDefinitionId,d=>contacts[d.SequencePath].Contacts);
             _mantleBranches = AlsMantlingBranchCompiler.Compile(_mantleResources.AnimationJson, _mantleHost.Profile);
         }
         _montages = _mantleHost is null ? new(definition.TurnMontageAssets, definition.AuthoredMontageAssets, definition.GroundedTransitionAssets) : _mantleHost.CreateRuntime(_mantleBranches);

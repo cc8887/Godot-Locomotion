@@ -36,6 +36,9 @@ def prepare(authoring,output,version):
                          bvhPath=o['motion.bvh']['path'],bvhSha256=o['motion.bvh']['sha256'],
                          motionPath=o['motion.npz']['path'],motionSha256=o['motion.npz']['sha256'])
         job['targetPlanarOrigin']=target_origin_reference(c,contracts['assets'])
+        if c['family']=='mantle':
+            job['targetMantlePolicy']=c.get('targetMantlePolicy')
+            job['mantleValidationReceipt']=metadata.get('mantleValidationReceipt')
         if c.get('targetGaitPolicy'):
             job['targetGaitPolicy']=c['targetGaitPolicy']
             job['gaitValidationReceipt']=metadata.get('gaitValidationReceipt')
@@ -114,6 +117,7 @@ def target_root_and_ik(raw,skeleton,job,*,canonical_origin=None,origin_reference
     """One target-space trajectory split, shared by raw/FBX and curve exports."""
     world=world_pose(raw,skeleton);count=raw['sampledKeyCount']
     root_rotation=world['root'][0].copy()
+    if job.get('_mantleRootRotation') is not None:root_rotation=job['_mantleRootRotation']
     ev=job['contract']['originalEvaluation'];family=job['contract']['family']
     if family in ('turn','rotate'):
         with np.load(job['motionPath'],allow_pickle=False) as motion:
@@ -124,7 +128,8 @@ def target_root_and_ik(raw,skeleton,job,*,canonical_origin=None,origin_reference
         root_rotation=Rotation.from_euler('z',(-heading+heading[0])[:,None]).as_matrix()@root_rotation
     authored,runtime,report=root_ownership.decompose(raw,skeleton,family=family,
         declared_root_motion=ev['enableRootMotion'],root_rotation=root_rotation,
-        canonical_origin=canonical_origin,origin_reference=origin_reference)
+        canonical_origin=canonical_origin,origin_reference=origin_reference,
+        mantle_root_positions=job.get('_mantleRootPositions'))
     job['_authoredRootRaw']=authored;job['_rootOwnershipReport']=report
     return runtime
 
@@ -229,6 +234,32 @@ def prepare_target_raw(j,v4,ref,index,*,factor_root=True):
             values=candidate[field];new[field]=sample_native_track(values,target,old,field=='rotations') if values else []
         result['tracks'].append(new)
     policy=j.get('targetGaitPolicy',j['contract'].get('targetGaitPolicy'))
+    if j['contract'].get('family')=='mantle':
+        from .mantle import target,POLICY,reference_input
+        if j.get('targetMantlePolicy',j['contract'].get('targetMantlePolicy'))!=POLICY:
+            raise ValueError('Mantle requires its configured target policy')
+        receipt=j.get('mantleValidationReceipt')
+        if not receipt or file_hash(receipt['file'])!=receipt['sha256']:
+            raise ValueError('Missing or changed mantle authoring receipt')
+        certified=read_json(receipt['file'])
+        _,_,identity=reference_input(j['contract']['semanticName'])
+        if (not certified.get('passed') or certified.get('policy')!=POLICY or
+            certified.get('semanticName')!=j['contract']['semanticName'] or certified.get('reference')!=identity or
+            receipt.get('deliveredMotionSha256')!=j['motionSha256'] or
+            certified.get('sampledKeyCount')!=result['sampledKeyCount'] or
+            abs(certified.get('playLengthSeconds',-1)-result['playLength'])>1e-6):
+            raise ValueError('Mantle authoring receipt does not certify these inputs')
+        j['_targetMantleInputRaw']=copy.deepcopy(result)
+        result,path,rotation,report=target(result,skel,j['contract']['semanticName'])
+        from .mantle_hand_repair import immutable_target_skin, repair as repair_mantle_hands
+        result,hand_report=repair_mantle_hands(result,skel,j['contract']['semanticName'],immutable_target_skin(skel))
+        report['handSkinRepair']=hand_report
+        report['checks'].append(dict(check='boundedTargetHandSkinRepair',passed=hand_report['passed']))
+        report['passed']=report['passed'] and hand_report['passed']
+        j['_mantleRootPositions']=path;j['_targetMantleReport']=report
+        j['_targetMantleRepairedRaw']=copy.deepcopy(result)
+        j['_mantleRootRotation']=rotation
+        policy=None
     name=target_gait.asset_name(source)
     periodic=(policy and name in target_gait.PILOTS and
               target_gait.PILOTS[name][1]!='sprint_acceleration' and
@@ -376,8 +407,24 @@ def stage(retarget,output,*,diagnostic=False):
     raw_dir.mkdir()
     rewritten=prepare_target_closure(jobs,v4,ref,index)
     contacts_by_source={};time_by_source={};motion_curves=[];gait_reports={};gait_files=[];authoring_trajectories=[];unsupported_gaits=[]
+    mantle_reports={}
     for source,j in jobs.items():
         result=rewritten[source];skel=ref if j['edition']=='refactored' else v4
+        if j.get('_targetMantleReport'):
+            report=j['_targetMantleReport'];mantle_reports[source]=report
+            report.update(finalRawSemanticSha256=root_ownership.semantic_hash(result),
+                          authoringReceipt=j['mantleValidationReceipt'])
+            folder=output/'target-mantle'/hashlib.sha256(source.encode()).hexdigest()
+            folder.mkdir(parents=True)
+            write_json(folder/'quality.json',report)
+            write_json(folder/'before.raw.json',j['_targetMantleInputRaw'])
+            write_json(folder/'after.raw.json',j['_targetMantleRepairedRaw'])
+            shutil.copy2(j['mantleValidationReceipt']['file'],folder/'authoring.json')
+            from .mantle import contact_curves
+            write_json(folder/'contact-curves.json',contact_curves(report,result))
+            gait_files.extend(folder.glob('*.json'))
+            if not report['passed'] and not diagnostic:
+                raise ValueError('Target mantle gate failed for '+source+'; evidence: '+str(folder/'quality.json'))
         if j.get('upperBodyValidationReceipt'):
             upper_path=output/'upper-body'/(hashlib.sha256(source.encode()).hexdigest()+'.json')
             upper_path.parent.mkdir(exist_ok=True)
@@ -567,6 +614,8 @@ def stage(retarget,output,*,diagnostic=False):
               assetRoot=prefix+'/v4',rawRoot=prefix+'/raw/',configRoot=prefix+'/config/',
               nativeRetargetBundle=str(Path(retarget).resolve()),quality='target gait pilots gated where configured; other contact envelopes and visual acceptance remain pending',rootMotionCurves=motion_curves,
               targetGaitChecks=[dict(source=source,policy=report['policy'],passed=report['passed']) for source,report in gait_reports.items()]+unsupported_gaits,
+              targetMantleChecks=[dict(source=source,policy=report['policy'],passed=report['passed'],
+                  file='target-mantle/'+hashlib.sha256(source.encode()).hexdigest()+'/quality.json') for source,report in mantle_reports.items()],
               authoringTrajectories=authoring_trajectories,rootOwnershipPolicy=root_ownership.POLICY,
               rootOwnershipReceipts=ownership_receipts,extractedRootMotionCurves=extracted_curves,
               finalFbxStatus='pending-native-bake',files=[])
@@ -575,6 +624,11 @@ def stage(retarget,output,*,diagnostic=False):
             missingNonPropSources=sorted(expected-set(jobs)),
             quality='diagnostic conversion; unchanged original fallback explicitly listed; quality failures retained',
             sourceClosureComplete=set(jobs)==expected)
+    if (config/'refactored_mantle_animation_inputs.json').exists():
+        from .mantle_contacts import export as export_mantle_contacts
+        from .mantle_curve_contract import CONTROL_FILE
+        controls=export_mantle_contacts(config,config/'refactored_mantle_contacts.json')
+        pack['mantleCurveContract']=dict(controlFile=CONTROL_FILE,**controls['curveContract'])
     for directory in (config,raw_dir):
         pack['files'] += [dict(path='res://'+p.relative_to(ROOT).as_posix(),sha256=file_hash(p)) for p in directory.rglob('*.json')]
     pack['files'].append(dict(path=prefix+'/v4/als_manifest.json',sha256=file_hash(asset_dir/'als_manifest.json')))
@@ -586,6 +640,8 @@ def stage(retarget,output,*,diagnostic=False):
     write_json(output/'final-fbx-request.json',dict(schemaVersion=1,version='RootOwnership_'+hashlib.sha256(prefix.encode()).hexdigest()[:20],
         pack='res://'+(output/'resource-pack.json').relative_to(ROOT).as_posix(),jobs=final_fbx_jobs))
     pack['files'].append(dict(path=prefix+'/final-fbx-request.json',sha256=file_hash(output/'final-fbx-request.json')))
+    if 'mantleCurveContract' in pack:
+        validate_mantle_curve_delivery(output/'resource-pack.json',pack)
     write_json(output/'resource-pack.json',pack)
     from .viewer_pack import register_production_pack
     register_production_pack(output/'resource-pack.json')
@@ -699,6 +755,55 @@ def finalize_requests(pack_path,requests):
         if not any(e['path']==resource for e in pack['files']):pack['files'].append(dict(path=resource,sha256=file_hash(compiled)))
     write_json(pack_path,pack)
 
+def validate_mantle_curve_delivery(pack_path,pack):
+    """Semantic preflight also applies to diagnostic, partially generated packs."""
+    from .mantle_curve_contract import CONTROL_FILE, contract, validate
+    folder=Path(pack_path).resolve().parent
+    if pack.get('mantleCurveContract')!=dict(controlFile=CONTROL_FILE,**contract()):
+        raise ValueError('Missing or unsupported mantle curve delivery contract; stage a fresh pack')
+    paths=[folder/CONTROL_FILE,folder/'config/refactored_mantle_animation_inputs.json',
+        folder/'config/refactored_mantle_root_tracks.json']
+    for path in paths:
+        uri='res://'+path.relative_to(ROOT).as_posix()
+        entries=[e for e in pack['files'] if e['path']==uri]
+        if not path.is_file() or len(entries)!=1 or entries[0]['sha256']!=file_hash(path):
+            raise ValueError('Missing or changed mantle curve contract payload: '+path.name)
+    value=read_json(paths[0])
+    if (value.get('animationInputsSha256')!=file_hash(paths[1]) or
+            value.get('rootInputsSha256')!=file_hash(paths[2])):
+        raise ValueError('Mantle curve contract binds different final inputs')
+    return validate(value,read_json(paths[1]),read_json(paths[2]))
+
+
+def validate_mantle_pack(pack_path,pack):
+    from .mantle import POLICY as MANTLE_POLICY
+    contracts=read_json(ROOT/'docs/architecture/kimodo-als-asset-contracts.json')['assets']
+    expected_mantles={r['source'] for r in contracts if r['family']=='mantle' and not is_prop(r)}
+    if {c['source'] for c in pack.get('targetMantleChecks',[])}!=expected_mantles:
+        raise ValueError('Missing complete per-asset mantle quality gates')
+    validate_mantle_curve_delivery(pack_path,pack)
+    control_path=pack_path.parent/'config/refactored_mantle_contacts.json'
+    control_entry=next((e for e in pack['files'] if e['path']=='res://'+control_path.resolve().relative_to(ROOT).as_posix()),None)
+    if not control_entry or not control_path.exists() or file_hash(control_path)!=control_entry['sha256']:
+        raise ValueError('Missing or changed dedicated mantle contact bake')
+    from .mantle_contacts import bake as bake_mantle_contacts
+    if read_json(control_path)!=bake_mantle_contacts(control_path.parent):
+        raise ValueError('Mantle contact curves do not bind the final pose/root inputs')
+    for check in pack.get('targetMantleChecks',[]):
+        path=pack_path.parent/check['file']
+        if not path.resolve().is_relative_to(pack_path.parent.resolve()):raise ValueError('Mantle gate path escapes pack')
+        entry=next((e for e in pack['files'] if e['path']=='res://'+path.resolve().relative_to(ROOT).as_posix()),None)
+        if not entry or file_hash(path)!=entry['sha256']:raise ValueError('Changed target mantle quality report')
+        report=read_json(path)
+        from .mantle_hand_repair import validate_report as validate_hand_repair
+        validate_hand_repair(report.get('handSkinRepair') or {})
+        if not check['passed'] or not report['passed'] or report['policy']!=MANTLE_POLICY:
+            raise ValueError('Target mantle quality failed; keep candidate inactive')
+        runtime=pack_path.parent/'root-ownership'/hashlib.sha256(check['source'].encode()).hexdigest()/'runtime.raw.json'
+        if report['finalRawSemanticSha256']!=root_ownership.semantic_hash(read_json(runtime)):
+            raise ValueError('Mantle quality does not certify the final raw')
+
+
 def activate(pack_path,verification):
     pack=read_json(pack_path);evidence=read_json(verification)
     if pack.get('status')=='diagnostic':raise ValueError('Diagnostic conversion is not eligible for activation')
@@ -727,6 +832,7 @@ def activate(pack_path,verification):
         if not compare(reference,read_json(quality_path.parent/(name+'.json')))['passed']:
             raise ValueError('Directional skating quality failed: '+name)
     if 'rootMotionCurves' not in pack:raise ValueError('Bake mandatory root-motion sidecars before activation')
+    validate_mantle_pack(pack_path,pack)
     if pack.get('rootOwnershipPolicy'):
         if pack['rootOwnershipPolicy']!=root_ownership.POLICY or pack.get('finalFbxStatus')!='native-bake-and-readback-verified':
             raise ValueError('Final FBX must use the decomposed raw and pass native readback')
