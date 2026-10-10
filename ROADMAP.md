@@ -1,5 +1,9 @@
 # Lyra 当前目标：可玩的 locomotion 与 ALS/Core 复用（2026-10-04）
 
+2026-10-10 Air 真实生成与默认接入：独立管线实际生成 Fall／Fall_Fast／Flail 三个候选、交付 16 身份，与当前其他资产组成 `als_nonprop_20261010_air_combined_v1`。123 个最终 FBX 和 1,536 个载荷摘要通过，107 个非 Air 运行姿态及 70 个道具资产保持。Air 最终 Godot 11/11、2,144 观察帧／1,334 空中帧／22 张 GPU 截图、三 Hz 单线程／并行逐帧一致；旧包同场景被拒绝，新旧胶囊物理前 50 帧完全相同。修正三个旧 Air 夹具的包配置、逻辑骨架和绝对／additive 预期接口，原断言保持。相关 16 项运行断言及普通无覆盖重启通过，默认指针已选择新诊断包。仍有 60 个非道具缺口，完整方向范围未全选，既有 Mantle Root 开启／取消姿态和负对照失败保留，整体运行／正式生产门禁未关闭；人工动作、Air 全蒙皮、长时间及性能验收开放。见[本轮证据与边界](docs/verification/2026-10-10-kimodo-air-integration.md)。
+
+2026-10-10 独立 Air pipeline：已将 Fall／Fall_Fast／Flail 与 Air Lean 制作独立于平面移动和 Mantle，新增 `--scope air` 与专用 PowerShell 入口，32 节点／3 个生成分支／16 身份；全非道具图复用同一分派。专用三维条件、源语义与有界周期制作、Air Root/Pelvis 所有权、目标 FK 及交付／运行前门禁已接入。相关 101/101 Python、真实 Kimodo 30／77 骨六组条件解析、三个受控 FBX 全键回读通过，旧三类错误源／目标被拒绝。当前默认及资产保持，本次没有新 diffusion／资源包／Godot／人工蒙皮验收；下一步以独立入口真实生成并执行完整交付与游戏检查，不能将受控夹具视为生成交付。见[稳定契约](docs/architecture/kimodo-air-pipeline.md)与[实际证据和验收边界](docs/verification/2026-10-10-kimodo-air-pipeline.md)。
+
 2026-10-10 Mantle 曲线判断已固化：新导出按 `mantle-curve-semantics-v1` 保留独立原始 Root 前移、记录避障平台段，声明仅高度入口匹配与时间驱动控制，拒绝持续距离驱动／Root Motion Warping 的虚假支持声明；烘焙／stage／启用／运行前门禁已接入。相关 Python 49/49，当前最终输入的独立烘焙及实际 .NET Import 三 sequence／173 键对照通过，原控制值及活动包保持。尚未新增持续匹配或 Mantle Root Motion Warping；旧包重新进入新 Pipeline 需构建新版本。本次无新 Kimodo 生成、最终 FBX 或 Godot 游戏验收。见[曲线语义门禁验证](docs/verification/2026-10-10-mantle-curve-semantics-gates.md)。
 
 2026-10-10 Mantle 文档合同：已明确 Pipeline 必须随包导出控制曲线、Godot ALS／其他导入项目必须识别并实际应用；补充 High 目标蒙皮避障前移的计算、字段／摘要／时间轴、缺失处理和发布端几何复核与 Import 校验的边界。见[稳定双向交付契约](docs/architecture/als-mantle-contact-control.md#pipeline-与导入项目的双向交付契约)与[文档核对记录](docs/verification/2026-10-10-mantle-curve-delivery-contract.md)。本次只更新文档，不新增能力协商字段或扩大既有运行验收范围。

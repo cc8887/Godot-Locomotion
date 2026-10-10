@@ -1,5 +1,7 @@
 # ALS 资源生产依赖图
 
+下落制作使用独立 `air.py` / `air_rules.json`，入口 `python tools/produce_als_resources.py inspect|plan|run --scope air` 或 `scripts/produce-air-als.ps1`。当前覆盖 Fall / Fall_Fast / Flail 和 Air Lean，共 16 个身份；专用三维髋部条件、有界周期制作、源／目标检查与交付回执并行于平面移动和 Mantle，复用共用转换／FBX／Godot 阶段。详细契约见[独立 Air pipeline](../../docs/architecture/kimodo-air-pipeline.md)。独立包仍诊断、全量生产门禁保持，默认指针不自动切换。
+
 Mantle 在 `publish stage` 中额外烘焙逐 sequence 的前移／抬升、剩余高度、双手独立接触权重、固定 ledge 局部 wrist 位置和 palm 朝向，并登记配置 payload。High 的前移按最终目标蒙皮与台沿模板延后，避免身体尚未越过台面就前移；它保留原落点，不改写 Root/Pelvis。具体计算与配套消费要求见[固定支撑及双向交付契约](../../docs/architecture/als-mantle-contact-control.md)。
 
 **生产端必须导出，导入项目必须识别。** 正式包交付 `config/refactored_mantle_contacts.json` 并登记文件 SHA256；导入项目须核对版本、最终姿态／Root 摘要、sequence 和时间轴，实际应用其中的 `advanceCm`、独立抬升及手部接触控制。只交付／导入 FBX 或 Root sidecar 不满足此合同。当前 Godot ALS 通过 `AlsMantlingDemoResources` → `AlsMantlingContactCompiler` → Core 进度／手部控制消费；其他项目需实现等价路径或显式报告不支持，不能以普通动画导入成功代替曲线验收。

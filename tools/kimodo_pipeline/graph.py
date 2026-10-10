@@ -185,6 +185,9 @@ def build_graph(contracts, rules):
                 source=motion(left), base=exact_base or base,
                 mask='legs' if 'Rifle' in name else 'all',
                 repairDerived=bool(gait_closure.get(left,{}).get('repairMirroredCycle',False)))
+        elif family in ('fall', 'flail'):
+            from .air import add_branch
+            add_branch(add, generate, nodes, key, row, rules)
         elif family == 'mantle':
             from .mantle import profile, INDEX, POLICY
             spec = profile(name)
@@ -347,8 +350,6 @@ def build_graph(contracts, rules):
                 # tumble with almost zero net actor displacement after extraction.
                 path={'kind':'linear','velocity':rules.get('rollTravelMeters',1.8)/(rules['candidateSeconds']-1/rules['fps']),
                       'direction':[0,1],'headingDegrees':0}
-            if family in ('fall', 'flail'):
-                anchors = []
             candidate = f'candidate:{name}'
             if name in gait_closure:
                 spec = gait_closure[name]
@@ -425,6 +426,9 @@ def build_graph(contracts, rules):
 
     for row in rows:
         name = row['semanticName']; source = motion(name); ev = row['originalEvaluation']
+        if row['family'] in ('fall', 'flail'):
+            from .air import POLICY as AIR_POLICY
+            row = dict(row, targetAirPolicy=AIR_POLICY)
         if row['family'] == 'mantle':
             from .mantle import POLICY
             row = dict(row, targetMantlePolicy=POLICY)

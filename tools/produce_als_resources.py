@@ -16,13 +16,13 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command',choices=('plan','run','inspect','inputs'))
     parser.add_argument('--contracts',type=Path,default=ROOT/'docs/architecture/kimodo-als-asset-contracts.json')
-    parser.add_argument('--rules',type=Path,default=ROOT/'tools/kimodo_pipeline/directional_gait_rules.json')
+    parser.add_argument('--rules',type=Path)
     parser.add_argument('--output',type=Path,default=ROOT/'artifacts/kimodo_als/production')
     parser.add_argument('--kimodo-repo',type=Path)
     parser.add_argument('--python',type=Path)
     parser.add_argument('--bindings',type=Path,help='Node id -> approved source path (relative to this JSON)')
     parser.add_argument('--target',action='append',help='Exact node id; includes all transitive prerequisites')
-    parser.add_argument('--scope',choices=('all','non-prop','mantle'),default='non-prop',help='Non-prop closure, mantle-only full-pipeline batch, or explicit diagnostic nodes')
+    parser.add_argument('--scope',choices=('all','non-prop','mantle','air'),default='non-prop',help='Non-prop closure, independent mantle/air full-pipeline lane, or explicit diagnostic nodes')
     parser.add_argument('--keep-going',action='store_true',help='Attempt independent branches; failed prerequisites still block dependents')
     parser.add_argument('--authoring-only',action='store_true',help='Explicit diagnostic exception: stop before conversion/runtime')
     parser.add_argument('--pack-output',type=Path)
@@ -30,7 +30,12 @@ def main():
     parser.add_argument('--dotnet',type=Path,default=Path.home()/'.dotnet/dotnet.exe')
     parser.add_argument('--offline-deps',type=Path,default=ROOT/'artifacts/kimodo_als/offline-python-deps')
     args=parser.parse_args()
-    graph=build_graph(read_json(args.contracts),load_rules(args.rules))
+    if args.rules is None:
+        args.rules=ROOT/'tools/kimodo_pipeline'/('air_rules.json' if args.scope=='air' else 'directional_gait_rules.json')
+    if args.scope=='air':
+        from tools.kimodo_pipeline.air import build_graph as build_air_graph
+        graph=build_air_graph(read_json(args.contracts),load_rules(args.rules))
+    else:graph=build_graph(read_json(args.contracts),load_rules(args.rules))
     if args.scope in ('non-prop','mantle'):
         from tools.kimodo_pipeline.scope import non_prop_targets
         if args.target:raise ValueError('Use either a named scope or explicit --target')
@@ -38,6 +43,10 @@ def main():
         if args.scope=='mantle':
             args.target=[key for key in args.target if graph['nodes'][key]['params']['contract']['family']=='mantle']
             if not args.target:raise ValueError('No mantle assets in the selected non-prop contract')
+    elif args.scope=='air':
+        from tools.kimodo_pipeline.air import targets
+        if args.target:raise ValueError('Use either the Air scope or explicit --target')
+        args.target=targets(read_json(args.contracts))
     order=topological_order(graph['nodes'],args.target)
     if args.command=='inspect':
         print(json.dumps({'summary':graph['summary'],'selectedOrder':order,
@@ -54,7 +63,7 @@ def main():
         path.write_text(json.dumps(requests,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
         print(json.dumps({'inputs':len(requests),'path':str(path)},ensure_ascii=False));return
     if not args.authoring_only:
-        if args.scope not in ('non-prop','mantle'):parser.error('Full pipeline requires --scope non-prop or mantle; explicit graph diagnostics use --authoring-only')
+        if args.scope not in ('non-prop','mantle','air'):parser.error('Full pipeline requires --scope non-prop, mantle or air; explicit graph diagnostics use --authoring-only')
         if not args.kimodo_repo:parser.error('Full pipeline requires --kimodo-repo')
         for path in (args.godot,args.dotnet,args.offline_deps/'ufbx/__init__.py'):
             if not path.is_file():parser.error('Full-pipeline dependency missing: '+str(path))

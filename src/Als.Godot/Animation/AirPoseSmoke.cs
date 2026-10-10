@@ -29,14 +29,10 @@ public partial class AirPoseSmoke : Node
         using var inner = new AlsJumpPoseGraph(library, set, sources, profile.NestedJump.Pose);
         using var leanFall = new AlsLeanPoseSampler(library, set, sources, profile.Fall.Lean);
         using var leanJump = new AlsLeanPoseSampler(library, set, sources, profile.Jump.Lean);
-        var rest = new AlsLocalPose[library.Skeleton.GetBoneCount()];
-        for (var bone = 0; bone < rest.Length; bone++)
-        {
-            var t = library.Skeleton.GetBoneRest(bone); var q = t.Basis.GetRotationQuaternion(); var s = t.Basis.Scale;
-            rest[bone] = new(new NVector3(t.Origin.X, t.Origin.Y, t.Origin.Z), new NQuaternion(q.X, q.Y, q.Z, q.W), new NVector3(s.X, s.Y, s.Z));
-        }
+        var poseSources = library.MovementSources(set, profile.SkeletonId);
+        var rest = poseSources.ReferencePose.ToArray();
         int[] ids = [profile.Fall.Loop, profile.Fall.Fast, profile.Fall.Flail, profile.Fall.Heavy, profile.Fall.Light, profile.Jump.Heavy, profile.Jump.Light];
-        var clips = new AlsLocalPoseClip?[7]; var curves = new AlsCurveSampler[7]; var curveIds = new Dictionary<string, int>[7];
+        var clips = new AlsMovementAnimationSource?[7]; var curves = new AlsCurveSampler[7]; var curveIds = new Dictionary<string, int>[7];
         var lengths = new float[7]; var times = new float[sources.Players.Length]; var sampleTimes = new float[sources.Samples.Length];
         var pose = new AlsLocalPose[rest.Length]; var retry = new AlsLocalPose[rest.Length];
         var expected = new AlsLocalPose[rest.Length]; var other = new AlsLocalPose[rest.Length]; var prediction = new AlsLocalPose[rest.Length];
@@ -48,7 +44,7 @@ public partial class AirPoseSmoke : Node
             for (var i = 0; i < ids.Length; i++)
             {
                 var animation = set.Animations[sources.Samples[sources.Players[ids[i]].SampleStart].AnimationId];
-                clips[i] = new(library.Library.GetAnimation(library.ClipNames[animation.Id]), library.Skeleton, ownsAnimation: false);
+                clips[i] = poseSources.Create(animation.Id);
                 curves[i] = new(animation.Curves); curveIds[i] = animation.Curves.ToDictionary(c => c.SourceName, c => c.CurveId);
                 names.UnionWith(curveIds[i].Keys); lengths[i] = animation.PlayLength;
             }
@@ -168,6 +164,6 @@ public partial class AirPoseSmoke : Node
             return name is "BasePose_N" or "Weight_InAir" ? AlsStandingCycleCurves.ModifyBlend(value, 1, 1) : value;
         }
     }
-    private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
+    private static string Read(string name) => Godot.FileAccess.GetFileAsString(AlsAnimationResourcePack.ConfigRoot + name);
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 }

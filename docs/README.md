@@ -3,6 +3,7 @@
 ## 从哪里开始
 
 - [代理工作约束](../AGENTS.md)：工作目录、修改边界、架构与验证原则。
+- [独立 Air pipeline](architecture/kimodo-air-pipeline.md)：下落／高速下落／Flail 与 Air Lean 的专用生成、竖直残差所有权、周期制作和交付门禁；[实现验证](verification/2026-10-10-kimodo-air-pipeline.md)及[真实生成、默认接入与游戏验证](verification/2026-10-10-kimodo-air-integration.md)。
 - [中高攀爬生成与实际游戏验证](verification/2026-10-10-medium-high-mantle.md)：生成 High／两 Low、目标蒙皮控制曲线、实际高度准备段补偿和可复用 Godot 高度／帧率／渲染检查。
 - [Kimodo Mantle 生成与导出](architecture/kimodo-mantle-export-policy.md)及[本批验证](verification/2026-10-09-kimodo-mantle-export-policy.md)：按动作类型分派手部/脚部条件、有界接触 IK、Root/Pelvis 特化和逐资产门禁。
 - [Mantle 实际生成](verification/2026-10-09-kimodo-mantle-generation.md)：四轮真实扩散对照、Low 部分交付、High 路径拒绝及完整转换/运行证据。

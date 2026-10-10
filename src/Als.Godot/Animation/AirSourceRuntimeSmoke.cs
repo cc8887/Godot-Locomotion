@@ -34,12 +34,7 @@ public partial class AirSourceRuntimeSmoke : Node
         using var library = AlsAnimationLibraryBuilder.Build(set, locomotion, poseProfile, sourceProfile: sources); AddChild(library.Root);
         using var graph = new AlsAirPoseGraph(library, set, sources, profile);
         var collector = new AlsAirSourceCollector(sources, profile);
-        var rest = new AlsLocalPose[library.Skeleton.GetBoneCount()];
-        for (var bone = 0; bone < rest.Length; bone++)
-        {
-            var t = library.Skeleton.GetBoneRest(bone); var q = t.Basis.GetRotationQuaternion(); var s = t.Basis.Scale;
-            rest[bone] = new(new NVector3(t.Origin.X, t.Origin.Y, t.Origin.Z), new NQuaternion(q.X, q.Y, q.Z, q.W), new NVector3(s.X, s.Y, s.Z));
-        }
+        var rest = library.MovementSources(set, profile.SkeletonId).ReferencePose.ToArray();
         var pose = new AlsLocalPose[rest.Length * 2]; var retryPose = new AlsLocalPose[pose.Length];
         string[] names = ["BasePose_N", "Weight_InAir", "FootLock_L", "FootLock_R", "Feet_Position", "AbsentAirSourceCurve"];
         var curves = new AlsInertialCurve[names.Length * 2]; var retryCurves = new AlsInertialCurve[curves.Length];
@@ -196,7 +191,7 @@ public partial class AirSourceRuntimeSmoke : Node
         return true;
     }
     private sealed class InjectedFailure : Exception;
-    private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
+    private static string Read(string name) => Godot.FileAccess.GetFileAsString(AlsAnimationResourcePack.ConfigRoot + name);
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 }
 

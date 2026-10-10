@@ -29,18 +29,14 @@ public partial class FallingLeanSmoke : Node
         var root = document.RootElement;
         var rows = root.GetProperty("staticSamples").EnumerateArray().Concat(root.GetProperty("runs").EnumerateArray()
             .SelectMany(r => r.GetProperty("frames").EnumerateArray())).ToArray();
-        var rest = new AlsLocalPose[library.Skeleton.GetBoneCount()];
-        for (var i = 0; i < rest.Length; i++)
-        {
-            var t = library.Skeleton.GetBoneRest(i); var q = t.Basis.Orthonormalized().GetRotationQuaternion(); var s = t.Basis.Scale;
-            rest[i] = new(new NVector3(t.Origin.X, t.Origin.Y, t.Origin.Z), new NQuaternion(q.X, q.Y, q.Z, q.W), new NVector3(s.X, s.Y, s.Z));
-        }
+        var poseSources = library.MovementSources(set, locomotion.SkeletonId);
+        var rest = poseSources.ReferencePose.ToArray();
         var frames = 0; var endpoints = 0; var curveChecks = 0;
         foreach (var node in new[] { 260, 282 })
         {
             var profile = AlsLeanSamplingCompiler.CompileFalling(Read("v4_falling_lean_sampling.json"), sources, set, node);
             using var sampler = new AlsLeanPoseSampler(library, set, sources, profile);
-            var clips = new AlsLocalPoseClip?[5]; var curves = new AlsCurveSampler[6]; var ids = new Dictionary<string, int>[6];
+            var clips = new AlsMovementAnimationSource?[5]; var curves = new AlsCurveSampler[6]; var ids = new Dictionary<string, int>[6];
             var lengths = new float[5]; var times = new float[5]; var weights = new float[5]; var order = new int[5];
             var output = new AlsLocalPose[rest.Length]; var retry = new AlsLocalPose[rest.Length]; var expected = new AlsLocalPose[rest.Length];
             try
@@ -52,7 +48,8 @@ public partial class FallingLeanSmoke : Node
                     if (i < 5)
                     {
                         lengths[i] = animation.PlayLength;
-                        clips[i] = new(library.Library.GetAnimation(library.ClipNames[animation.Id]), library.Skeleton, ownsAnimation: false);
+                        // Compare base + additive with the independently sampled absolute source.
+                        clips[i] = poseSources.Create(animation.Id, rawBonePose: true);
                     }
                 }
                 // These source assets have no authored curves; the outer ModifyCurve owns these names.
@@ -108,6 +105,6 @@ public partial class FallingLeanSmoke : Node
         GD.Print($"FALLING_LEAN_SMOKE_OK frames={frames} endpoints={endpoints} curves={curveChecks} identities=2");
     }
 
-    private static string Read(string name) => Godot.FileAccess.GetFileAsString("res://assets/config/" + name);
+    private static string Read(string name) => Godot.FileAccess.GetFileAsString(AlsAnimationResourcePack.ConfigRoot + name);
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 }

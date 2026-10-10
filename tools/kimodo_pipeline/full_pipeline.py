@@ -9,12 +9,21 @@ from .runner import write_json, file_hash
 from .publish import ROOT, finalize_requests, validate_mantle_curve_delivery
 
 
-def verify_runtime(pack, output, godot, dotnet, python):
+def verify_runtime(pack, output, godot, dotnet, python, *, runtime_cases=None):
     """Keep fresh logs and attempt the matrix even if diagnostic acceptance fails."""
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=True)
     report=output/'runtime-result.json'
     if report.exists():raise ValueError('Runtime evidence already exists; use a fresh output directory')
     selected=read_json(pack)
+    if selected.get('targetAirChecks') or selected.get('airPipelineContract'):
+        try:
+            from .air import validate_pack as validate_air_pack
+            assessment=validate_air_pack(pack,selected)
+        except (ValueError, KeyError, TypeError, OSError) as error:
+            write_json(report,dict(status='runtime_failed',pack=str(pack),productionReady=False,activated=False,
+                checks=[dict(name='air-pipeline-contract',passed=False,reason=str(error))]))
+            raise ValueError('Air pipeline preflight failed; evidence: '+str(report)) from error
+        write_json(output/'air-pipeline-contract.json',assessment)
     if selected.get('targetMantleChecks') or selected.get('mantleCurveContract'):
         try:
             assessment=validate_mantle_curve_delivery(pack,selected)
@@ -29,6 +38,8 @@ def verify_runtime(pack, output, godot, dotnet, python):
         env.pop(key,None)
     env['ALS_RESOURCE_PACK_PATH']=resource
     checks=[]
+    if selected.get('targetAirChecks') or selected.get('airPipelineContract'):
+        checks.append(dict(name='air-pipeline-contract',passed=True,report=str(output/'air-pipeline-contract.json')))
     if selected.get('targetMantleChecks') or selected.get('mantleCurveContract'):
         checks.append(dict(name='mantle-curve-contract',passed=True,report=str(output/'mantle-curve-contract.json')))
     def update_viewer():
@@ -70,8 +81,13 @@ def verify_runtime(pack, output, godot, dotnet, python):
         matrix=output/'e2e-matrix'
         matrix_command=[python,ROOT/'scripts/verify-als-nonprop-e2e.py','--pack',resource,
             '--output',matrix,'--godot',godot,'--headless-fixed-fps','60']
+        for case in runtime_cases or ():
+            matrix_command += ['--only',case]
         if read_json(pack).get('missingNonPropSources'):matrix_command.append('--diagnostic-partial-pack')
         run('e2e-matrix',matrix_command,marker='ALS_NON_PROP_E2E_OK',timeout=7200)
+        if selected.get('targetAirChecks'):
+            run('air-scene',[python,ROOT/'scripts/verify-kimodo-air-scene.py',
+                '--pack',pack,'--output',output/'air-scene','--godot',godot],timeout=2400)
         if read_json(pack).get('targetMantleChecks'):
             # Gameplay completion alone does not certify hand contact or skin.
             # Retain failures and still execute the independent platform cases.
@@ -83,16 +99,18 @@ def verify_runtime(pack, output, godot, dotnet, python):
     else:
         checks.append(dict(name='e2e-matrix',passed=False,status='blocked',reason='Godot build/import failed'))
     result=dict(status='runtime_passed' if all(c['passed'] for c in checks) else 'runtime_failed',
-        pack=resource,packSha256=file_hash(pack),checks=checks,productionReady=False,activated=False)
+        pack=resource,packSha256=file_hash(pack),checks=checks,productionReady=False,activated=False,
+        requestedRuntimeCases=list(runtime_cases) if runtime_cases is not None else None)
     write_json(report,result)
     # Request finalization changes the pack byte hash; refresh same-batch Viewer.
     update_viewer()
     return result
 
 
-def complete_run(runner, authoring_result, *, pack=None, godot=None, dotnet=None, deps=None):
+def complete_run(runner, authoring_result, *, pack=None, godot=None, dotnet=None, deps=None, runtime_cases=None):
     from .offline_pipeline import convert_bundle
     stamp=datetime.now().strftime('%Y%m%d_%H%M%S')
+    pipeline_scope=getattr(runner,'graph',{}).get('pipeline','non-prop')
     output=runner.output/'full-pipeline'
     if output.exists():raise ValueError('Full pipeline output exists; preserve evidence and choose a fresh run output')
     output.mkdir()
@@ -113,14 +131,15 @@ def complete_run(runner, authoring_result, *, pack=None, godot=None, dotnet=None
         return result
     deps=Path(deps or ROOT/'artifacts/kimodo_als/offline-python-deps')
     sys.path.insert(0,str(deps));sys.path.insert(0,str(runner.repo))
-    pack=Path(pack or ROOT/'assets/generated'/('als_nonprop_'+stamp))
+    pack=Path(pack or ROOT/'assets/generated'/('als_nonprop_'+('air_' if pipeline_scope=='air' else '')+stamp))
     bid=(authoring_result.get('viewerBatch') or {}).get('id')
     phase='conversion'
     try:
         conversion=convert_bundle(bundle_path,receipt_path,output/'conversion',pack,batch_id=bid)
-        write_json(pack/'pipeline-provenance.json',dict(batchId=bid,authoringBundle=str(bundle_path),pipeline='pure-python-full-v1'))
+        write_json(pack/'pipeline-provenance.json',dict(batchId=bid,authoringBundle=str(bundle_path),pipeline='pure-python-full-v1',productionLane=pipeline_scope))
         phase='runtime'
-        runtime=verify_runtime(pack/'resource-pack.json',output/'runtime',godot,dotnet,runner.python)
+        runtime=verify_runtime(pack/'resource-pack.json',output/'runtime',godot,dotnet,runner.python,
+            runtime_cases=runtime_cases)
     except Exception as error:
         result=dict(authoring=authoring_result,status='pipeline_complete_rejected',activated=False,
             failedPhase=phase,error=str(error),evidence=str(output),
@@ -129,8 +148,12 @@ def complete_run(runner, authoring_result, *, pack=None, godot=None, dotnet=None
         return result
     accepted=(authoring_result['status']=='authoring_complete' and runtime['status']=='runtime_passed' and
         conversion['sourceClosureComplete'] and not conversion['failedTargetGaits'] and
-        not conversion['failedTargetMantles'] and conversion['finalFbxReadback']['passed'])
+        not conversion['failedTargetMantles'] and not conversion.get('failedTargetAir',[]) and conversion['finalFbxReadback']['passed'])
     result=dict(authoring=authoring_result,conversion=conversion,runtime=runtime,
         status='pipeline_complete' if accepted else 'pipeline_complete_rejected',activated=False)
+    if pipeline_scope=='air':
+        expected={k for k,n in runner.graph['nodes'].items() if n['op']=='deliver'}
+        result.update(productionLane='air',sourceScopeComplete={a['node'] for a in assets}==expected,
+                      sourceScopeAssets=len(expected),productionReady=False)
     write_json(output/'result.json',result)
     return result

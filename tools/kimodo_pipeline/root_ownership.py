@@ -94,6 +94,18 @@ def decompose(raw, skeleton, *, family, declared_root_motion=False, root_rotatio
         if rp.shape != (count,3) or not np.isfinite(rp).all() or canonical_origin is not None:
             raise ValueError('Invalid mantle root profile/time domain')
         method = 'mantle-nominal-reference-XYZ-preserve-pelvis-residual'
+    elif family in ('fall','flail'):
+        # A validated Air loop has no actor path. A constant XY origin keeps
+        # the complete periodic residual closed; an open-path smoother does not.
+        if declared_root_motion or canonical_origin is not None:
+            raise ValueError('Air loops cannot own actor Root Motion or inherit a path origin')
+        positions=world['pelvis'][1][:,:2]
+        center=positions.mean(axis=0)
+        if np.max(np.linalg.norm(positions-center,axis=1))>MARGIN_CM:
+            raise ValueError('Air planar residual exceeds its independent envelope')
+        origin[:2]=center-ref_position[:2]
+        rp[:,:2]=ref_position[:2]
+        method='periodic-air-constant-origin-preserve-XYZ-residual'
     elif family in POSE_FAMILIES:
         if canonical_origin is not None:
             origin = np.asarray(canonical_origin, dtype=float)

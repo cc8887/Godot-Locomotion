@@ -131,6 +131,9 @@ def target_root_and_ik(raw,skeleton,job,*,canonical_origin=None,origin_reference
         canonical_origin=canonical_origin,origin_reference=origin_reference,
         mantle_root_positions=job.get('_mantleRootPositions'))
     job['_authoredRootRaw']=authored;job['_rootOwnershipReport']=report
+    if family in ('fall','flail'):
+        from .air import analyze_target
+        job['_targetAirReport']=analyze_target(runtime,skeleton,job['contract']['semanticName'])
     return runtime
 
 def curve_values(name,job,contacts,gait_report=None):
@@ -234,6 +237,9 @@ def prepare_target_raw(j,v4,ref,index,*,factor_root=True):
             values=candidate[field];new[field]=sample_native_track(values,target,old,field=='rotations') if values else []
         result['tracks'].append(new)
     policy=j.get('targetGaitPolicy',j['contract'].get('targetGaitPolicy'))
+    if j['contract'].get('family') in ('fall','flail'):
+        from .air import validate_source_receipt
+        validate_source_receipt(j)
     if j['contract'].get('family')=='mantle':
         from .mantle import target,POLICY,reference_input
         if j.get('targetMantlePolicy',j['contract'].get('targetMantlePolicy'))!=POLICY:
@@ -407,9 +413,20 @@ def stage(retarget,output,*,diagnostic=False):
     raw_dir.mkdir()
     rewritten=prepare_target_closure(jobs,v4,ref,index)
     contacts_by_source={};time_by_source={};motion_curves=[];gait_reports={};gait_files=[];authoring_trajectories=[];unsupported_gaits=[]
-    mantle_reports={}
+    mantle_reports={};air_reports={}
     for source,j in jobs.items():
         result=rewritten[source];skel=ref if j['edition']=='refactored' else v4
+        if j.get('_targetAirReport'):
+            report=j['_targetAirReport'];air_reports[source]=report
+            report['authoringReceipt']=j['airValidationReceipt']
+            folder=output/'target-air'/hashlib.sha256(source.encode()).hexdigest()
+            folder.mkdir(parents=True)
+            write_json(folder/'quality.json',report)
+            shutil.copy2(j['airValidationReceipt']['file'],folder/'authoring.json')
+            shutil.copy2(j['airTrajectory']['file'],folder/'trajectory.json')
+            gait_files.extend(folder.glob('*.json'))
+            if not report['passed'] and not diagnostic:
+                raise ValueError('Target Air gate failed for '+source+'; evidence: '+str(folder/'quality.json'))
         if j.get('_targetMantleReport'):
             report=j['_targetMantleReport'];mantle_reports[source]=report
             report.update(finalRawSemanticSha256=root_ownership.semantic_hash(result),
@@ -476,6 +493,9 @@ def stage(retarget,output,*,diagnostic=False):
             fallback_times=contact_data(result,skel)[1]
             times=[next((e['time'] for e in report['events'] if e['side']==side),fallback_times[i]) for i,side in enumerate(('left','right'))]
         else:contacts,times=contact_data(result,skel)
+        if j['contract']['semanticName'] in ('Fall','Fall_Fast','Flail','Air_Lean','Air_Lean_Forward','Air_Lean_Backward','Air_Lean_Left','Air_Lean_Right'):
+            # No grounded contact estimate or FootLock may be authored into Air.
+            contacts=[np.zeros(result['sampledKeyCount']),np.zeros(result['sampledKeyCount'])]
         rewritten[source]=result;contacts_by_source[source]=contacts;time_by_source[source]=times
     overlay_contracts=assemble_overlay_lower_body(jobs,rewritten,{'v4':v4,'refactored':ref})
     ownership_files=[];ownership_receipts=[];extracted_curves=[];final_fbx_jobs=[]
@@ -616,9 +636,14 @@ def stage(retarget,output,*,diagnostic=False):
               targetGaitChecks=[dict(source=source,policy=report['policy'],passed=report['passed']) for source,report in gait_reports.items()]+unsupported_gaits,
               targetMantleChecks=[dict(source=source,policy=report['policy'],passed=report['passed'],
                   file='target-mantle/'+hashlib.sha256(source.encode()).hexdigest()+'/quality.json') for source,report in mantle_reports.items()],
+              targetAirChecks=[dict(source=source,policy=report['policy'],passed=report['passed'],
+                  file='target-air/'+hashlib.sha256(source.encode()).hexdigest()+'/quality.json') for source,report in air_reports.items()],
               authoringTrajectories=authoring_trajectories,rootOwnershipPolicy=root_ownership.POLICY,
               rootOwnershipReceipts=ownership_receipts,extractedRootMotionCurves=extracted_curves,
               finalFbxStatus='pending-native-bake',files=[])
+    if air_reports:
+        from .air import contract as air_contract
+        pack['airPipelineContract']=air_contract()
     if diagnostic:
         pack.update(productionReady=False,conversionBackend=bundle.get('conversionBackend'),
             missingNonPropSources=sorted(expected-set(jobs)),
@@ -833,6 +858,8 @@ def activate(pack_path,verification):
             raise ValueError('Directional skating quality failed: '+name)
     if 'rootMotionCurves' not in pack:raise ValueError('Bake mandatory root-motion sidecars before activation')
     validate_mantle_pack(pack_path,pack)
+    from .air import validate_pack as validate_air_pack
+    validate_air_pack(pack_path,pack)
     if pack.get('rootOwnershipPolicy'):
         if pack['rootOwnershipPolicy']!=root_ownership.POLICY or pack.get('finalFbxStatus')!='native-bake-and-readback-verified':
             raise ValueError('Final FBX must use the decomposed raw and pass native readback')

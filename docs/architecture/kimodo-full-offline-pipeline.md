@@ -1,5 +1,7 @@
 # Kimodo 完整纯脚本生产入口
 
+下落动作另有与平面移动、Mantle 并行的[独立 Air pipeline](kimodo-air-pipeline.md)：`--scope air` 只执行其真实依赖闭包；完整非道具图中的 Fall / Fall_Fast / Flail 同样使用 Air 专用源制作和目标门禁，再复用下方转换、FBX、Godot 阶段。
+
 生成请求默认使用 `tools/produce_als_resources.py run` 或 `scripts/produce-non-prop-als.ps1`，执行作者 DAG、目标资产转换、Godot 导入和运行验证。`plan` / `inspect` / `inputs` 保持只读规划；局部作者试验需明确 `--authoring-only --scope all --target ...`。
 
 ## 阶段和制品

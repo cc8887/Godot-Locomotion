@@ -162,6 +162,10 @@ class Runner:
             if not index.is_absolute():index=Path(__file__).resolve().parents[2]/index
             _,_,payload=original_input(index,node['params']['source'])
             identity['nativeReferenceInputs']={str(index):file_hash(index),str(payload):file_hash(payload)}
+        if node['op']=='native_air_reference' or node['params'].get('contract',{}).get('family') in ('fall','flail'):
+            from .air import reference_input
+            _,_,reference_identity=reference_input(node['params'].get('semantic') or node['params']['contract']['semanticName'])
+            identity['nativeAirInputs']=reference_identity
         if node['op']=='generate' and self.repo and not binding:
             identity['checkpoints']=self.checkpoint_identity(node['params']['model'])
             identity['textEncoderDevice']=self.backend_env.get('TEXT_ENCODER_DEVICE','cpu')
@@ -252,6 +256,14 @@ class Runner:
             m.save_motion(folder/'motion.npz',motion,rig)
             write_json(folder/'constraint-reference.json',receipt)
             return
+        if op=='native_air_reference':
+            from .air import native_reference
+            index=Path(p['indexPath'])
+            if not index.is_absolute():index=Path(__file__).resolve().parents[2]/index
+            motion,receipt=native_reference(p['semantic'],rig,index)
+            m.save_motion(folder/'motion.npz',motion,rig)
+            write_json(folder/'constraint-reference.json',receipt)
+            return
         if op=='native_gait_reference':
             from .als_reference import native_gait_reference
             index=Path(p['indexPath'])
@@ -262,7 +274,11 @@ class Runner:
             return
         if op=='generate':
             if not self.repo:raise ValueError('Generation requires --kimodo-repo')
-            if p.get('mantleReference'):
+            if p.get('airReference'):
+                from .air import materialize_constraints
+                constraints,constraint_receipt=materialize_constraints(p,self.motion(p['airReference']),rig)
+                write_json(folder/'air-constraints.json',constraint_receipt)
+            elif p.get('mantleReference'):
                 from .mantle import materialize_constraints
                 constraints,constraint_receipt=materialize_constraints(p,self.motion(p['mantleReference']),rig)
                 write_json(folder/'mantle-constraints.json',constraint_receipt)
@@ -331,7 +347,20 @@ class Runner:
             if len(motion['root_positions'])!=int(p['seconds']*p['fps']):raise ValueError('Kimodo frame count/FPS differs from plan')
             m.save_motion(folder/'motion.npz',motion,rig)
             write_json(folder/'generation-settings.json',p);return
-        if op=='mantle':
+        if op=='air_cycle':
+            from .air import author,AirError,POLICY
+            if p['policy']!=POLICY:raise ValueError('Unknown Air authoring policy')
+            source_outputs=self.output_of(p['source'])
+            if 'constraint-reference.json' in source_outputs:raise ValueError('Constraint-only Air reference cannot become a delivery')
+            try:
+                motion,receipt,trajectory=author(self.motion(p['source']),self.motion(p['reference']),rig,p['semantic'])
+            except AirError as error:
+                write_json(folder/'air-validation.json',error.receipt)
+                raise
+            receipt['sourceMotionSha256']=source_outputs['motion.npz']['sha256']
+            write_json(folder/'air-validation.json',receipt)
+            write_json(folder/'air-trajectory.json',trajectory)
+        elif op=='mantle':
             from .mantle import author,MantleError,POLICY
             if p['policy']!=POLICY:raise ValueError('Unknown mantle policy')
             source_outputs=self.output_of(p['source'])
@@ -431,7 +460,9 @@ class Runner:
         elif op=='loop':motion=m.loop_candidate(self.motion(p['source']),p['seconds'],p['startFraction'],rig,p['removeHeading'],p['removeTranslation'])
         elif op=='in_place':motion=m.remove_planar_path(self.motion(p['source']),p['rootPath'],p['seconds'],rig)
         elif op=='deliver':
-            row=p['contract'];timing=row['originalTiming'];motion=m.resample(self.motion(p['source']),timing['sampledKeyCount'],rig)
+            row=p['contract'];timing=row['originalTiming'];source_motion=self.motion(p['source'])
+            motion=source_motion if row['family'] in ('fall','flail') else m.resample(source_motion,timing['sampledKeyCount'],rig)
+            if len(motion['root_positions'])!=timing['sampledKeyCount']:raise ValueError('Delivery key count differs')
             motion['fps']=np.asarray(timing['frameRateNumerator']/timing['frameRateDenominator'])
             asset_metadata={'source':row['source'],'asset':row['asset'],'edition':row['edition'],
                         'motionEncoding':'full_pose_native_soma77','productionReady':False,
@@ -470,6 +501,20 @@ class Runner:
                 asset_metadata['mantleValidationReceipt']=dict(file=gate['path'],sha256=gate['sha256'],
                     sourceMotionFile=outputs['motion.npz']['path'],sourceMotionSha256=outputs['motion.npz']['sha256'])
                 asset_metadata['note']='Generated mantle pose in validated native time domain; native PoseStanding/PoseGrounded semantics retained; contact metadata and root curves are authored on the target.'
+            if row['family'] in ('fall','flail'):
+                from .air import POLICY as AIR_POLICY
+                from .gait import _array_hash
+                outputs=self.output_of(p['source']);gate=outputs.get('air-validation.json');trajectory=outputs.get('air-trajectory.json')
+                if row.get('targetAirPolicy')!=AIR_POLICY or gate is None or trajectory is None:
+                    raise ValueError('Air delivery requires its dedicated authoring gate and trajectory')
+                receipt=read_json(gate['path'])
+                if (receipt.get('passed') is not True or receipt.get('policy')!=AIR_POLICY or
+                    receipt.get('semanticName')!=row['semanticName'] or
+                    receipt.get('sampledKeyCount')!=timing['sampledKeyCount'] or
+                    receipt.get('outputMotionSha256')!=_array_hash(motion['local_rot_mats'],motion['root_positions'],motion['fps'])):
+                    raise ValueError('Air delivery altered validated motion/time domain')
+                asset_metadata['airValidationReceipt']=dict(file=gate['path'],sha256=gate['sha256'])
+                asset_metadata['airTrajectory']=dict(file=trajectory['path'],sha256=trajectory['sha256'])
             if p['base']:m.save_motion(folder/'additive-reference-full-pose.npz',self.motion(p['base']),rig)
         else:raise ValueError(f'Unknown operation {op}')
         if op in ('gait_cycle', 'mirror'):
@@ -489,6 +534,8 @@ class Runner:
                     raise ValueError('Walk upper-body posture exceeds its generated Idle reference limits')
         m.save_motion(folder/'motion.npz',motion,rig)
         if op=='deliver':
+            if asset_metadata.get('airValidationReceipt'):
+                asset_metadata['airValidationReceipt']['deliveredMotionSha256']=file_hash(folder/'motion.npz')
             if 'gaitValidationReceipt' in asset_metadata:
                 asset_metadata['gaitValidationReceipt']['deliveredMotionSha256']=file_hash(folder/'motion.npz')
             if 'mantleValidationReceipt' in asset_metadata:
