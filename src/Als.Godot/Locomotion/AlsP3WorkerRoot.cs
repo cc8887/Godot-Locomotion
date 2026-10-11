@@ -9,6 +9,7 @@ using GodotAls.Core.Contracts;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
 using GodotAls.Import.Compilation;
+using GodotAls.Import.Resources;
 using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
@@ -160,6 +161,8 @@ public partial class AlsP3WorkerRoot : Node3D
         AlsP3CharacterState state,
         in Transform3D initialLogicalTransform)
     {
+        using var trace = AlsPerformanceTrace.Begin("worker.configure",
+            characterId: state.Handle.CharacterId, generation: state.Handle.Generation);
         AlsRuntimeState.ValidateP4Defaults(in _runtimeState);
         _context = context;
         _state = state;
@@ -169,48 +172,77 @@ public partial class AlsP3WorkerRoot : Node3D
         {
             if (AlsP3FrameStages.SplitFeet && context.Measurement is not null)
                 throw new InvalidOperationException("Split foot dispatch requires a measurement adapter covering both animation halves and main physics queries.");
-            _poseProfile = AlsPoseProfileCompiler.Compile(
-                File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)),
-                context.AnimationSet,
-                context.Profile);
-            _turnRotateSettings = CompileTurnRotateSettings(
-                context.AnimationSet,
-                _poseProfile);
-            var profileFootSettings = _poseProfile.Feet;
-            var motorSettings = context.MotorSettings;
-            _standingFootSettings = AlsP4FootPlacementSettingsCompiler.Compile(
-                in profileFootSettings,
-                in motorSettings,
-                AlsStance.Standing);
-            _crouchingFootSettings = AlsP4FootPlacementSettingsCompiler.Compile(
-                in profileFootSettings,
-                in motorSettings,
-                AlsStance.Crouching);
-            CompileCurveSamplers(context.AnimationSet, _poseProfile);
-            _library = context.MovementGraph is not null ? AlsAnimationLibraryBuilder.BuildP5a(context.AnimationSet, context.SourceBindings!) : AlsAnimationLibraryBuilder.Build(
-                context.AnimationSet,
-                context.Profile,
-                _poseProfile,
-                sourceProfile: context.MovementGraph?.Sources);
-            if (context.MovementGraph is not null) _library.UseMovementSources(context.AnimationSet, context.MovementGraph.RawSources);
+            using (var profileTrace = AlsPerformanceTrace.Begin("worker.pose_profile"))
+            {
+                _poseProfile = AlsPoseProfileCompiler.Compile(
+                    File.ReadAllText(ProjectSettings.GlobalizePath(P4ProfilePath)),
+                    context.AnimationSet,
+                    context.Profile);
+                _turnRotateSettings = CompileTurnRotateSettings(
+                    context.AnimationSet,
+                    _poseProfile);
+                var profileFootSettings = _poseProfile.Feet;
+                var motorSettings = context.MotorSettings;
+                _standingFootSettings = AlsP4FootPlacementSettingsCompiler.Compile(
+                    in profileFootSettings,
+                    in motorSettings,
+                    AlsStance.Standing);
+                _crouchingFootSettings = AlsP4FootPlacementSettingsCompiler.Compile(
+                    in profileFootSettings,
+                    in motorSettings,
+                    AlsStance.Crouching);
+                CompileCurveSamplers(context.AnimationSet, _poseProfile);
+                profileTrace?.Complete();
+            }
+            using (var libraryTrace = AlsPerformanceTrace.Begin("worker.animation_library"))
+            {
+                _library = context.MovementGraph is not null ? AlsAnimationLibraryBuilder.BuildP5a(context.AnimationSet, context.SourceBindings!) : AlsAnimationLibraryBuilder.Build(
+                    context.AnimationSet,
+                    context.Profile,
+                    _poseProfile,
+                    sourceProfile: context.MovementGraph?.Sources);
+                if (context.MovementGraph is not null) _library.UseMovementSources(context.AnimationSet, context.MovementGraph.RawSources);
+                libraryTrace?.Complete();
+            }
             _visualRoot = _library.Root as Node3D
                 ?? throw new InvalidOperationException("P3 visual library root must be a Node3D.");
             AddChild(_library.Root);
-            _graph = AlsLocomotionGraphBuilder.Build(
-                _library,
-                context.Profile,
-                _poseProfile,
-                context.AnimationSet,
-                context.SourceBindings);
-            _controller = new AlsLocomotionAnimationController(
-                _graph,
-                context.Settings,
-                _poseProfile,
-                context.AnimationSet);
-            _controller.Warmup();
+            using (var graphTrace = AlsPerformanceTrace.Begin("worker.graph_and_controller"))
+            {
+                using (var buildTrace = AlsPerformanceTrace.Begin("worker.graph_build"))
+                {
+                    using var resources = new ImportResourceScope("character.graph");
+                    _graph = AlsLocomotionGraphBuilder.Build(
+                        _library,
+                        context.Profile,
+                        _poseProfile,
+                        context.AnimationSet,
+                        context.SourceBindings);
+                    buildTrace?.Complete();
+                }
+                using (var controllerTrace = AlsPerformanceTrace.Begin("worker.controller_create"))
+                {
+                    _controller = new AlsLocomotionAnimationController(
+                        _graph,
+                        context.Settings,
+                        _poseProfile,
+                        context.AnimationSet);
+                    controllerTrace?.Complete();
+                }
+                graphTrace?.Complete();
+            }
+            using (var warmupTrace = AlsPerformanceTrace.Begin("worker.warmup"))
+            {
+                _controller.Warmup();
+                warmupTrace?.Complete();
+            }
             if (context.MovementGraph is not null)
+            {
+                using var movementTrace = AlsPerformanceTrace.Begin("worker.complete_movement");
                 _controller.EnableCompleteMovement(context.MovementGraph, _library, context.AnimationSet, _poseProfile,
                     state.Handle.CharacterId,state.Handle.Generation);
+                movementTrace?.Complete();
+            }
             _skeleton = _graph.TargetSkeleton;
             if (context.PropProfile is not null) _props = new(context.PropProfile, context.PropSources!, context.AnimationSet);
             ConfigureFootProbeSource(context.AnimationSet, _poseProfile);
@@ -221,33 +253,41 @@ public partial class AlsP3WorkerRoot : Node3D
             _visualRoot.GlobalTransform = correctedRoot;
             AlsP3Presentation.ThrowIfNonFinite(_visualRoot.GlobalTransform);
             var poseWriter = context.PoseWriterFactory?.Invoke(_skeleton);
-            _poseModifier = poseWriter is null
-                ? new AlsComponentPoseModifier(
-                    _skeleton,
-                    _visualRoot,
-                    _library,
-                    context.AnimationSet,
-                    _poseProfile,
-                    null,
-                    AlsPoseAffineTestFixture.None,
-                    initialLogicalTransform)
-                : new AlsComponentPoseModifier(
-                    _skeleton,
-                    _visualRoot,
-                    _library,
-                    context.AnimationSet,
-                    _poseProfile,
-                    poseWriter,
-                    AlsPoseAffineTestFixture.None,
-                    initialLogicalTransform);
+            using (var modifierTrace = AlsPerformanceTrace.Begin("worker.pose_modifier"))
+            {
+                _poseModifier = poseWriter is null
+                    ? new AlsComponentPoseModifier(
+                        _skeleton,
+                        _visualRoot,
+                        _library,
+                        context.AnimationSet,
+                        _poseProfile,
+                        null,
+                        AlsPoseAffineTestFixture.None,
+                        initialLogicalTransform)
+                    : new AlsComponentPoseModifier(
+                        _skeleton,
+                        _visualRoot,
+                        _library,
+                        context.AnimationSet,
+                        _poseProfile,
+                        poseWriter,
+                        AlsPoseAffineTestFixture.None,
+                        initialLogicalTransform);
+                modifierTrace?.Complete(_skeleton.GetBoneCount());
+            }
             var boneCount = _skeleton.GetBoneCount();
             _posePositions = new Vector3[boneCount];
             _poseRotations = new Quaternion[boneCount];
             _poseScales = new Vector3[boneCount];
 
-            InitializeFootProbeOrigins(initialLogicalTransform);
-            ConfigureNativeFeet(initialLogicalTransform);
-            CapturePose();
+            using (var feetTrace = AlsPerformanceTrace.Begin("worker.native_feet"))
+            {
+                InitializeFootProbeOrigins(initialLogicalTransform);
+                ConfigureNativeFeet(initialLogicalTransform);
+                CapturePose();
+                feetTrace?.Complete(boneCount);
+            }
             PublishVisualRootVisibility(0);
 
             // Thread ownership is assigned only after the complete visual rig is built and warmed.
@@ -255,6 +295,7 @@ public partial class AlsP3WorkerRoot : Node3D
             ProcessThreadGroup = context.Mode == AlsHarnessMode.Parallel
                 ? ProcessThreadGroupEnum.SubThread
                 : ProcessThreadGroupEnum.MainThread;
+            trace?.Complete(boneCount);
         }
         catch
         {

@@ -2,11 +2,13 @@ using System.Threading;
 using Godot;
 using GodotAls.Animation;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Exchange;
 using GodotAls.Core.Events;
 using GodotAls.Core.Locomotion;
 using GodotAls.Dispatch;
 using GodotAls.Import.Compilation;
+using GodotAls.Import.Resources;
 using NumericsVector3 = System.Numerics.Vector3;
 
 namespace GodotAls.Locomotion;
@@ -408,11 +410,17 @@ public sealed class AlsP3RuntimeContext
         bool headlessOrDebug,
         IAlsP3RuntimeMeasurement? measurement = null)
     {
+        using var trace = AlsPerformanceTrace.Begin("context.build");
+        using var resources = new ImportResourceScope("character.context");
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         AnimationSet = animationSet ?? throw new ArgumentNullException(nameof(animationSet));
         Profile = profile ?? throw new ArgumentNullException(nameof(profile));
         PresentationTransform = AlsP3Presentation.Create(profile.Presentation);
-        FootGatherSettings = LoadFootGatherSettings(animationSet, profile);
+        using (var footSettings = AlsPerformanceTrace.Begin("context.foot_settings"))
+        {
+            FootGatherSettings = LoadFootGatherSettings(animationSet, profile);
+            footSettings?.Complete();
+        }
         MovementGraph = profile.StandingWalkRun.Length == 6
             ? AlsMovementGraphDefinition.Load(animationSet, profile) : null;
         if (MovementGraph is not null && AlsAnimationRuntimeOptions.Has("--foot-ik-frame"))
@@ -438,6 +446,7 @@ public sealed class AlsP3RuntimeContext
         MainManagedThreadId = mainManagedThreadId;
         HeadlessOrDebug = headlessOrDebug;
         Measurement = measurement;
+        trace?.Complete();
     }
 
     public AlsHarnessMode Mode { get; }

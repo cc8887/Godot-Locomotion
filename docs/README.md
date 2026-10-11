@@ -4,6 +4,8 @@
 
 - [代理工作约束](../AGENTS.md)：工作目录、修改边界、架构与验证原则。
 - [Kimodo 跑步生产范围](architecture/kimodo-run-pipeline.md)：六个方向循环、严格源／目标检查、有界接触计划延长和已有交付复用；[首次生成与缺口](verification/2026-10-11-kimodo-run-generation.md)、[五方向约束修复与保留失败](verification/2026-10-11-kimodo-run-constraints.md)、[镜像与周期去重修复、重新验收和游戏测试](verification/2026-10-11-kimodo-run-mirror-revalidation.md)。
+- [启动性能埋点与命令行采集](architecture/performance-instrumentation.md)：EventSource/EventPipe、AI 可读 JSON/CSV、时间线与基线差值；[真实采集及热点](verification/2026-10-11-startup-performance-instrumentation.md)。
+- [通用资源管理](architecture/resource-management.md)：单资源身份、Provider/Loader、依赖失效、版本引用与启动缓存；[实现和性能验证](verification/2026-10-11-resource-management.md)。
 - [Kimodo 缺失资源派生](architecture/kimodo-derived-resources.md)：从已有生成候选独立采样静态姿态、Lean/Acceleration、已验收母动作复用与组合包完整转换；[本批证据](verification/2026-10-10-kimodo-derived-resources.md)。
 - [自动翻滚恢复测试的接地前置条件](verification/2026-10-10-ragdoll-recovery-fixture.md)：旧固定 2 秒误判、夹具修正、22/22 相关运行与未接地负对照；新 Land／贴地 Roll 已默认接入。
 - [Land／Roll 提示词修订与候选验证](verification/2026-10-10-kimodo-landing-prompt-regeneration.md)：可配置的蹲伏／翻滚描述、真实同 seed 对照与候选重采样，保留恢复失败和原有门禁；不新增固定动作风格检查。
@@ -14,6 +16,7 @@
 - [最新生成资产统一默认包](verification/2026-10-10-latest-generated-default-pack.md)：最新 Idle／Walk 等与手部修复 Low 攀爬统一选择、原版回退清单和普通默认启动验证。
 - [Kimodo Mantle 生成与导出](architecture/kimodo-mantle-export-policy.md)及[本批验证](verification/2026-10-09-kimodo-mantle-export-policy.md)：按动作类型分派手部/脚部条件、有界接触 IK、Root/Pelvis 特化和逐资产门禁。
 - [Mantle 实际生成](verification/2026-10-09-kimodo-mantle-generation.md)：四轮真实扩散对照、Low 部分交付、High 路径拒绝及完整转换/运行证据。
+- [运行时完整性校验资源范围](verification/2026-10-11-runtime-integrity-scope.md)：默认关闭 SHA-256；启用时仅核验活动 V4 manifest 登记资源，排除诊断／测试载荷并保留完整离线审计清单。
 - [Mantle 朝向与 Viewer 播放检查](verification/2026-10-09-kimodo-mantle-orientation.md)：纯脚本全帧方向／Root 曲线、component 与 FBX 手性、真实 Three.js 播放修复及 Godot 模型相对旋转对照。
 - [Mantle 默认活动指针与游戏启动](verification/2026-10-09-kimodo-mantle-active-pointer.md)：用户选择 Mantle v4 诊断包、四个 Low 替换身份及普通 Demo 真实启动。
 - [Mantle 可复用真实场景验证](verification/2026-10-09-kimodo-mantle-scene.md)：直接运行测试场景，Low 三种物理 Hz／根运动开关／单线程、候选与原版 GPU 截图及程序集完整性；不依赖 computer-use。

@@ -4,6 +4,7 @@ using GodotAls.Animation;
 using GodotAls.Assets;
 using GodotAls.Core.Locomotion;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Dispatch;
 using GodotAls.Import;
 using GodotAls.Import.Compilation;
@@ -184,6 +185,8 @@ public partial class P4LocomotionDemo : Node3D
 
     public override void _Ready()
     {
+        using var trace = AlsPerformanceTrace.Begin("demo.ready");
+        using var resources = new GodotAls.Import.Resources.ImportResourceScope("demo.configuration");
         try
         {
             var overlayArg = OS.GetCmdlineUserArgs().FirstOrDefault(value => value.StartsWith("--overlay="));
@@ -211,15 +214,27 @@ public partial class P4LocomotionDemo : Node3D
             _translationAnchorX = _translatingPlatform.Position.X;
             ValidateWorkField();
 
-            var animationSetResource = ResourceLoader.Load<AlsAnimationSetResource>(
-                AlsGodotImportCoordinator.CompiledResourcePath)
-                ?? throw new InvalidOperationException("P4 demo animation set resource is missing.");
+            AlsAnimationSetResource animationSetResource;
+            using (var resourceTrace = AlsPerformanceTrace.Begin("animation_set.resource_load",
+                AlsGodotImportCoordinator.CompiledResourcePath))
+            {
+                animationSetResource = ResourceLoader.Load<AlsAnimationSetResource>(
+                    AlsGodotImportCoordinator.CompiledResourcePath)
+                    ?? throw new InvalidOperationException("P4 demo animation set resource is missing.");
+                resourceTrace?.Complete(1);
+            }
             if (AlsKimodoSourceGate.IsEnabled()) AlsKimodoSourceGate.VerifyRuntimeResource();
             var animationSet = animationSetResource.LoadDefinition();
-            var profile = AlsLocomotionProfileCompiler.Compile(
-                Godot.FileAccess.GetFileAsString(ProfilePath), animationSet);
-            var settings = AlsLocomotionSettings.Load(
-                Godot.FileAccess.GetFileAsString(SettingsPath));
+            AlsLocomotionAnimationProfile profile;
+            AlsLocomotionSettings settings;
+            using (var configTrace = AlsPerformanceTrace.Begin("demo.configuration"))
+            {
+                profile = AlsLocomotionProfileCompiler.Compile(
+                    Godot.FileAccess.GetFileAsString(ProfilePath), animationSet);
+                settings = AlsLocomotionSettings.Load(
+                    Godot.FileAccess.GetFileAsString(SettingsPath));
+                configTrace?.Complete();
+            }
             var motorSettings = CreateMotorSettings(settings);
             _context = new AlsP3RuntimeContext(
                 _smokeRuntimePolicy?.Mode ?? AlsHarnessMode.Parallel,
@@ -261,6 +276,8 @@ public partial class P4LocomotionDemo : Node3D
                 AddChild(NativeCamera);
                 _hud.EnableNativeCameraHelp();
             }
+            trace?.Complete();
+            AlsPerformanceTrace.Log.Milestone("demo.configured", -1, -1, 0);
         }
         catch (Exception exception)
         {

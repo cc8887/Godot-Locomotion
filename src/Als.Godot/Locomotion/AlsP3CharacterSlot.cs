@@ -1,6 +1,7 @@
 using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Exchange;
 
 namespace GodotAls.Locomotion;
@@ -213,6 +214,9 @@ public partial class AlsP3CharacterSlot : Node
         Vector3 characterPosition,
         bool active)
     {
+        using var trace = AlsPerformanceTrace.Begin("character.create",
+            characterId: handle.CharacterId, generation: handle.Generation,
+            workerRole: active ? "active" : "spare");
         var commandSource = _commandSourceFactory()
             ?? throw new InvalidOperationException("P3 command-source factory returned null.");
         var character = new AlsP3Character
@@ -231,6 +235,7 @@ public partial class AlsP3CharacterSlot : Node
                 _exchangeSlot,
                 _footProbeExchange);
             character.SetSchedulingActive(active);
+            trace?.Complete();
             return character;
         }
         catch

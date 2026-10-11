@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Threading;
 using Godot;
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Diagnostics;
 
 namespace GodotAls.Locomotion;
 
@@ -145,8 +146,12 @@ public partial class AlsP3CommitStage : Node
         // is hidden. Visibility must not be a prerequisite for its next update.
         if (!candidate.PresentationPending)
         {
+            var firstVisualCommit = Volatile.Read(ref _state.VisualReady) == 0;
             Volatile.Write(ref _state.VisualReady, 1);
             _owner.ShowCommittedVisual(identity);
+            if (firstVisualCommit)
+                AlsPerformanceTrace.Log.Milestone("character.first_visual_commit",
+                    identity.CharacterId, identity.SlotGeneration, identity.FrameId);
         }
         // No owner access after callbacks: gameplay may free the character or start a new action.
         _context.DispatchCommittedAnimationEvents(result, animationOwnership);

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Godot;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Animation;
 using GodotAls.Core.Contracts;
 using GodotAls.Core.Transitions;
@@ -382,10 +383,11 @@ public static class AlsAnimationLibraryBuilder
         int rootMotionExtractionLogicalBoneId,
         int rootMotionExtractionPhysicalBoneId)
     {
+        using var trace = AlsPerformanceTrace.Begin("animation.library_build");
         using var importedAnimationName = new StringName(ImportedAnimationName);
         var mannequin = GetMannequin(animationSet, skeletonId, mannequinMeshId);
         using var targetScene = LoadScene(mannequin.ResourcePath, mannequin.Name, "target");
-        var targetRoot = targetScene.Instantiate();
+        var targetRoot = InstantiateScene(targetScene, mannequin.ResourcePath);
         AnimationLibrary? library = null;
         StringName? libraryName = null;
         OwnedStringNameTable? names = null;
@@ -404,8 +406,9 @@ public static class AlsAnimationLibraryBuilder
             foreach (var animationId in animationIds)
             {
                 var clip = GetClip(animationSet, animationId, skeletonId);
+                using var clipTrace = AlsPerformanceTrace.Begin("animation.clip", clip.ResourcePath, animationId);
                 using var sourceScene = LoadScene(clip.ResourcePath, clip.Name, "animation");
-                using var sourceRoot = new OwnedNode(sourceScene.Instantiate());
+                using var sourceRoot = new OwnedNode(InstantiateScene(sourceScene, clip.ResourcePath));
                 var sourcePlayer = AlsImportedResourceAuditor.FindFirst<AnimationPlayer>(sourceRoot.Value)
                     ?? throw new InvalidOperationException(
                         $"Animation scene has no AnimationPlayer: {clip.Name}");
@@ -428,15 +431,19 @@ public static class AlsAnimationLibraryBuilder
                         $"expected={clip.PlayLength} actual={sourceAnimation.Length}");
                 }
 
-                using var boundAnimation = (Godot.Animation)sourceAnimation.Duplicate(true);
-                if (normalizedTrackDomainAnimationIds?.Contains(animationId) == true)
+                using var boundAnimation = DuplicateAnimation(sourceAnimation);
+                using (var bindingTrace = AlsPerformanceTrace.Begin("animation.bind"))
                 {
-                    NormalizeTrackDomains(boundAnimation);
+                    if (normalizedTrackDomainAnimationIds?.Contains(animationId) == true)
+                    {
+                        NormalizeTrackDomains(boundAnimation);
+                    }
+                    AlsAnimationBinder.RewriteTrackPaths(
+                        targetRoot, targetSkeleton, boundAnimation, clip.Name);
+                    AlsAnimationBinder.ApplyReferencePoseRootLock(
+                        targetSkeleton, boundAnimation, clip, skeletonDefinition);
+                    bindingTrace?.Complete(boundAnimation.GetTrackCount());
                 }
-                AlsAnimationBinder.RewriteTrackPaths(
-                    targetRoot, targetSkeleton, boundAnimation, clip.Name);
-                AlsAnimationBinder.ApplyReferencePoseRootLock(
-                    targetSkeleton, boundAnimation, clip, skeletonDefinition);
                 StringName? animationName = new($"clip_{animationId}");
                 try
                 {
@@ -446,6 +453,7 @@ public static class AlsAnimationLibraryBuilder
                         clip.Name);
                     names.Add(animationId, animationName);
                     animationName = null;
+                    clipTrace?.Complete(boundAnimation.GetTrackCount());
                 }
                 finally
                 {
@@ -527,6 +535,7 @@ public static class AlsAnimationLibraryBuilder
             libraryName = null;
             names = null;
             p5a = null;
+            trace?.Complete(animationIds.Count);
             return result;
         }
         catch
@@ -970,10 +979,31 @@ public static class AlsAnimationLibraryBuilder
     private static PackedScene LoadScene(
         string resourcePath,
         string assetName,
-        string assetKind) =>
-        ResourceLoader.Load<PackedScene>(AlsImportedResourceAuditor.ToResourcePath(resourcePath))
-        ?? throw new InvalidOperationException(
-            $"Unable to load P3 {assetKind} scene: {assetName}");
+        string assetKind)
+    {
+        using var trace = AlsPerformanceTrace.Begin("scene.load", resourcePath);
+        var scene = ResourceLoader.Load<PackedScene>(AlsImportedResourceAuditor.ToResourcePath(resourcePath))
+            ?? throw new InvalidOperationException(
+                $"Unable to load P3 {assetKind} scene: {assetName}");
+        trace?.Complete();
+        return scene;
+    }
+
+    private static Node InstantiateScene(PackedScene scene, string resourcePath)
+    {
+        using var trace = AlsPerformanceTrace.Begin("scene.instantiate", resourcePath);
+        var node = scene.Instantiate();
+        trace?.Complete();
+        return node;
+    }
+
+    private static Godot.Animation DuplicateAnimation(Godot.Animation source)
+    {
+        using var trace = AlsPerformanceTrace.Begin("animation.duplicate");
+        var animation = (Godot.Animation)source.Duplicate();
+        trace?.Complete(animation.GetTrackCount());
+        return animation;
+    }
 
     private static void ThrowIfError(Error error, string operation, string assetName)
     {

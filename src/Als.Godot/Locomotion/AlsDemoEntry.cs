@@ -1,5 +1,7 @@
 using Godot;
 using GodotAls.Animation;
+using GodotAls.Core.Diagnostics;
+using GodotAls.Import.Resources;
 
 namespace GodotAls.Locomotion;
 
@@ -13,8 +15,10 @@ public partial class AlsDemoEntry : Node
 
     public override void _Ready()
     {
+        using var trace = AlsPerformanceTrace.Begin("demo.bootstrap");
         try
         {
+            using var resources = new ImportResourceScope("demo.startup");
             var arguments = OS.GetCmdlineUserArgs();
             bool initialLyra = arguments.Contains("--locomotion=lyra");
             if (initialLyra && (arguments.Contains("--lyra-main-smoke") || arguments.Contains("--lyra-terrain-smoke")))
@@ -23,12 +27,22 @@ public partial class AlsDemoEntry : Node
                 var lyra = ResourceLoader.Load<PackedScene>("res://scenes/demo/lyra_locomotion_demo.tscn")
                     ?? throw new InvalidOperationException("Lyra Main Demo scene is missing.");
                 AddChild(lyra.Instantiate<LyraLocomotionDemo>());
+                trace?.Complete();
                 return;
             }
             AlsAnimationRuntimeOptions.ConfigureDemo();
-            var scene = ResourceLoader.Load<PackedScene>("res://scenes/demo/p4_locomotion_demo.tscn")
-                ?? throw new InvalidOperationException("ALS Demo scene is missing.");
-            Demo = scene.Instantiate<P4LocomotionDemo>();
+            PackedScene scene;
+            using (var loadTrace = AlsPerformanceTrace.Begin("demo.scene_load", "res://scenes/demo/p4_locomotion_demo.tscn"))
+            {
+                scene = ResourceLoader.Load<PackedScene>("res://scenes/demo/p4_locomotion_demo.tscn")
+                    ?? throw new InvalidOperationException("ALS Demo scene is missing.");
+                loadTrace?.Complete(1);
+            }
+            using (var instanceTrace = AlsPerformanceTrace.Begin("demo.scene_instantiate"))
+            {
+                Demo = scene.Instantiate<P4LocomotionDemo>();
+                instanceTrace?.Complete(1);
+            }
             Demo.EnableNativeCamera = true;
             ConfigureBeforeReady?.Invoke(Demo);
             AddChild(Demo);
@@ -40,6 +54,7 @@ public partial class AlsDemoEntry : Node
                 Switcher.Configure(Demo, initialLyra);
                 AddChild(Switcher);
             }
+            if (Demo.IsRuntimeReady) trace?.Complete();
         }
         catch (Exception exception)
         {

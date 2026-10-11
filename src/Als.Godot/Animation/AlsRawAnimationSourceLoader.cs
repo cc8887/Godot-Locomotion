@@ -1,4 +1,5 @@
 using System.Text.Json;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Import.Compilation;
 
 namespace GodotAls.Animation;
@@ -65,6 +66,7 @@ internal static class AlsRawAnimationSourceLoader
     private static AlsRawAnimationSourceBank Compile(string indexName, AlsAnimationSetDefinition set,
         string bindingDigest, int playerCount, int sampleCount, ReadOnlySpan<int> rootAnimationIds)
     {
+        using var trace = AlsPerformanceTrace.Begin("raw_sources.compile", indexName);
         var directory = ConfigDirectory;
         var generatedIndex = GeneratedDirectory + indexName;
         if (Godot.FileAccess.FileExists(generatedIndex))
@@ -73,8 +75,18 @@ internal static class AlsRawAnimationSourceLoader
             if (candidate.RootElement.GetProperty("request").GetProperty("definitionDigest").GetString() == set.DefinitionDigest)
                 directory = GeneratedDirectory;
         }
-        return AlsRawAnimationSourceCompiler.Compile(Godot.FileAccess.GetFileAsString(directory + indexName), set,
+        var result = AlsRawAnimationSourceCompiler.Compile(Godot.FileAccess.GetFileAsString(directory + indexName), set,
             bindingDigest, playerCount, sampleCount, rootAnimationIds,
-            relative => Godot.FileAccess.GetFileAsBytes(directory + relative));
+            relative => ReadResource(directory + relative));
+        trace?.Complete(rootAnimationIds.Length);
+        return result;
+    }
+
+    private static byte[] ReadResource(string path)
+    {
+        using var trace = AlsPerformanceTrace.Begin("raw_sources.read", path);
+        var bytes = Godot.FileAccess.GetFileAsBytes(path);
+        trace?.Complete(1, bytes.LongLength);
+        return bytes;
     }
 }

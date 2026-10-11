@@ -1,4 +1,5 @@
 using GodotAls.Core.Contracts;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Actions;
 using GodotAls.Core.Events;
 using GodotAls.Core.Locomotion;
@@ -85,6 +86,7 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
     public static AlsMovementGraphDefinition Load(AlsAnimationSetDefinition set,
         AlsLocomotionAnimationProfile locomotion, AlsPoseAnimationProfile? pose = null, bool loadRawSources = true)
     {
+        using var trace = AlsPerformanceTrace.Begin("movement.definition");
         var json = Read("v4_main_movement_graph.json"); var cache = Read("v4_pose_cache_graph.json");
         pose ??= AlsPoseProfileCompiler.Compile(Read("p4_pose_profile.json"), set, locomotion);
         var sources = AlsLocomotionSourceCompiler.CompileWithMovement(json, set, locomotion.SkeletonId);
@@ -171,13 +173,18 @@ internal sealed record AlsMovementGraphDefinition(AlsLocomotionSourceProfile Sou
         definition = definition.WithActionPlayback(set) with { GroundedEntryNotify = AlsGroundedEntryNotifyCompiler.Compile(
             Read("v4_grounded_notify_semantics.json"), Read("v4_overlay_transition_inputs.json"), set,
             AlsGroundedMachineCompiler.CompileMovement(json), actionProfile) };
-        if (!loadRawSources) return definition;
+        if (!loadRawSources)
+        {
+            trace?.Complete();
+            return definition;
+        }
         var rawSources = AlsRawAnimationSourceLoader.Load(set, definition);
         var aimSources = AlsRawAnimationSourceLoader.LoadAim(set, definition.AimSampling).ReuseResourcesFrom(rawSources);
         var overlaySources = AlsRawAnimationSourceLoader.LoadOverlay(set, definition.OverlaySources)
             .ReuseOverlappingResourcesFrom(rawSources).ReuseOverlappingResourcesFrom(aimSources);
         var ragdollSources = AlsRawAnimationSourceLoader.LoadRagdoll(set, definition.RagdollPose).ReuseOverlappingResourcesFrom(rawSources);
         var stopSources = AlsRawAnimationSourceLoader.LoadStop(set, definition.StopTransitions).ReuseOverlappingResourcesFrom(rawSources);
+        trace?.Complete();
         return definition with { RawSources = rawSources, AimRawSources = aimSources, OverlayRawSources = overlaySources,
             RagdollRawSources = ragdollSources, StopRawSources = stopSources };
     }

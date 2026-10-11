@@ -19,11 +19,27 @@ internal sealed class AlsRefactoredDemoStances
     internal AlsRefactoredLocomotionHistory CommittedMotionHistory { get; private set; }
     private AlsRefactoredLocomotionHistory _nextMotionHistory;
     private AlsRefactoredLocomotionHost? _host;
+    private uint _resourceCharacter, _resourceGeneration;
     private AlsRefactoredCharacterNotifyBinding? _notifyBinding;
     internal void BindNotifies(AlsRefactoredCharacterNotifyBinding binding)
     {
         if (_host is not null || _notifyBinding is not null) throw new InvalidOperationException("Notify binding is immutable after construction.");
         _notifyBinding = binding;
+    }
+
+    internal void InitializeResources(uint character, uint generation)
+    {
+        if (_host is not null)
+        {
+            if (_resourceCharacter != character || _resourceGeneration != generation)
+                throw new ArgumentException("Foreign character resource initialization.");
+            return;
+        }
+        using var trace = GodotAls.Core.Diagnostics.AlsPerformanceTrace.Begin("animation.character_sources",
+            characterId: character, generation: generation);
+        _host = _locomotion.CreateRuntime(character, generation, _notifyBinding?.Sources);
+        _resourceCharacter = character; _resourceGeneration = generation;
+        trace?.Complete(_host.Sources.PlayerCount);
     }
     internal int ExtractNotifies(Span<AlsAdditionalSourceNotify> destination)
     {
@@ -130,9 +146,9 @@ internal sealed class AlsRefactoredDemoStances
     {
         if (_prepared) throw new InvalidOperationException("Refactored Demo frame still pending.");
         _identity = frame.Identity; _delta = frame.DeltaTime;
-        _host ??= _locomotion.CreateRuntime(_identity.CharacterId, _identity.SlotGeneration, _notifyBinding?.Sources);
+        InitializeResources(_identity.CharacterId, _identity.SlotGeneration);
         _nextCounter = _counter.HasUpdated ? _counter.Next((ulong)frame.Identity.FrameId) : new(0, (ulong)frame.Identity.FrameId);
-        var pending = _host.CommittedIdentity.SlotGeneration == 0;
+        var pending = _host!.CommittedIdentity.SlotGeneration == 0;
         var velocity = AlsFootIkCoordinates.ToNative(frame.ActualVelocity);
         var yaw = -frame.CharacterYaw * (180d / Math.PI); var view = -frame.Command.ViewYaw * (180d / Math.PI);
         var half = yaw * (Math.PI / 360d);

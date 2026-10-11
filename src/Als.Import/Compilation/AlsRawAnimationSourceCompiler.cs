@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using GodotAls.Core.Diagnostics;
 using GodotAls.Core.Locomotion;
 
 namespace GodotAls.Import.Compilation;
@@ -54,16 +55,26 @@ public static class AlsRawAnimationSourceCompiler
             Require(!sources.ContainsKey(knownAnimation.Id), "Duplicate raw source resource.");
             Require(skeletons.TryGetValue(knownAnimation.SkeletonId, out var skeleton), "Missing raw source skeleton.");
             var file = Text(row, "file");
+            using var sourceTrace = AlsPerformanceTrace.Begin("raw_sources.asset", file, knownAnimation.Id);
             // Equality to this canonical relative name also excludes traversal, alternate separators,
             // absolute paths, empty components and ambiguous case before invoking the reader.
             Require(file == "raw_sequences/" + assetId + ".json", "Raw source file must use its canonical asset path.");
             var hash = Text(row, "sha256");
             Require(hash.Length == 64 && hash.All(Uri.IsHexDigit), "Invalid raw source SHA256.");
             var bytes = readAssetBytes(file) ?? throw new ArgumentException("Missing raw source bytes: " + file);
-            Require(Convert.ToHexString(SHA256.HashData(bytes)).Equals(hash, StringComparison.OrdinalIgnoreCase),
-                "Raw source bytes differ from their indexed SHA256: " + file);
-            using var assetDocument = JsonDocument.Parse(bytes);
-            var source = CompileSource(assetDocument.RootElement, knownAnimation, skeleton!, animationByPath, file, hash);
+            using (var hashTrace = AlsPerformanceTrace.Begin("raw_sources.payload_hash", file))
+            {
+                Require(Convert.ToHexString(SHA256.HashData(bytes)).Equals(hash, StringComparison.OrdinalIgnoreCase),
+                    "Raw source bytes differ from their indexed SHA256: " + file);
+                hashTrace?.Complete(1, bytes.LongLength);
+            }
+            AlsRawAnimationSourceDefinition source;
+            using (var decodeTrace = AlsPerformanceTrace.Begin("raw_sources.decode", file))
+            {
+                using var assetDocument = JsonDocument.Parse(bytes);
+                source = CompileSource(assetDocument.RootElement, knownAnimation, skeleton!, animationByPath, file, hash);
+                decodeTrace?.Complete(knownAnimation.SampledKeyCount);
+            }
             sources.Add(knownAnimation.Id, source);
             var owners = new HashSet<int>();
             if (row.TryGetProperty("dependencyOf", out var ownerRows))
@@ -77,6 +88,7 @@ public static class AlsRawAnimationSourceCompiler
                 Require(owners.Count != 0, "An exported dependencyOf field must identify its owners.");
             }
             declaredOwners.Add(knownAnimation.Id, owners);
+            sourceTrace?.Complete(1, bytes.LongLength);
         }
         ValidateClosure(roots, sources, declaredOwners);
         var usedSkeletons = sources.Values.Select(s => s.PoseData.Identity.SkeletonId).ToHashSet();

@@ -308,6 +308,9 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         if (AlsAnimationRuntimeOptions.Has("--refactored-pose-curves")) _refactoredPoseReader = new(CurveNames);
         if (_standing.RefactoredMovementCurves is not null && _poseMoving < 0)
             throw new InvalidOperationException("Production root lost the movement cache curve layout.");
+        // Construct source players while the shared import resources are available,
+        // before assigning the character to worker threads. No frame is advanced.
+        _base.RefactoredStances?.InitializeResources(character, generation);
     }
 
     public void Prepare(in AlsFrameInput input, in AlsFrameResult result, bool cancelForRuntimeFailure = false)
