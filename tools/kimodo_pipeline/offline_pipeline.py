@@ -62,7 +62,7 @@ def convert_bundle(authoring, receipts_path, output, pack, *, batch_id=None, res
                 bvhPath=outputs['motion.bvh']['path'],bvhSha256=outputs['motion.bvh']['sha256'],
                 raw=str(raw_path),rawSha256=file_hash(raw_path),fbx=str(fbx),fbxSha256=file_hash(fbx),
                 retargetedAssetPath='offline:'+node,targetPlanarOrigin=target_origin_reference(contract,contracts))
-            for key in ('gaitValidationReceipt','authoringTrajectory','upperBodyValidationReceipt','mantleValidationReceipt','airValidationReceipt','airTrajectory'):
+            for key in ('gaitValidationReceipt','authoringTrajectory','upperBodyValidationReceipt','mantleValidationReceipt','airValidationReceipt','airTrajectory','poseSamplingReceipt'):
                 if metadata.get(key):j[key]=metadata[key]
             for key in ('targetGaitPolicy','targetCleanup','targetMantlePolicy','targetAirPolicy'):
                 if contract.get(key):j[key]=contract[key]

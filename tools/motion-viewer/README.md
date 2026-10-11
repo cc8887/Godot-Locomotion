@@ -20,6 +20,8 @@ python -m tools.kimodo_pipeline.viewer_export --run-dir artifacts/tests/<batch> 
 
 单栏、A/B 与链路视口统一以源资产原点 `(0,0,0)` 为参照，采用 cm、共同正交相机和比例尺；旋转/缩放联动，禁止按骨盆或包围盒自动构图。加载不会改变相机或清除资产的水平常量。参见 [空间契约](../../docs/architecture/kimodo-viewer-comparison-space.md) 与 [真实浏览器对照](../../docs/verification/2026-10-08-kimodo-viewer-origin-comparison.md)。
 
+标准视图区分 SOMA Y-up、ALS component Z-up 和已反射 Y 的导出 FBX：分别显示为 `(X,Y,Z)`、`(X,Z,Y)`、`(X,Z,-Y)`。目标预览声明 `coordinateSpace=als-component`，旧 Z-up 预览兼容识别，不重写注册文件。离线 writer 的 ASCII FBX 在加载内存中展开空块、适配 T/R/S 曲线标签；缺 Root／take／轨道直接报错。独立回读通过仍需核对实际 Viewer 播放，见[朝向检查及逐键证据](../../docs/verification/2026-10-09-kimodo-mantle-orientation.md)。
+
 ④ 栏的 FBX 及⑦ raw 文本读取普通 Demo 当前活动包；页首显示包路径，错误配置直接报错。①②③ 为现有中间目录，同名关联不保证是活动包的实际上游。
 
 ⑧ 水平轨迹分解对照读取专用 probe 输出：before／authored／inplace／original 可用 A/B 在同一原点比较。首帧按钮暂停并归零所有视口；A/B 同步由当前激活视口控制，拖动右栏时间也同步左栏。此阶段的候选不是活动包。见[分解设计及验证](../../docs/architecture/kimodo-planar-root-ownership.md)。

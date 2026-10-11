@@ -209,6 +209,10 @@ class Runner:
         from . import motion as m
         import numpy as np
         p=node['params'];op=node['op']
+        if op == 'reuse_motion':
+            from .derived import handle_reuse
+            handle_reuse(self, node, folder)
+            return
         if op=='rig':
             if binding:
                 rig=read_json(binding['path'])
@@ -377,6 +381,11 @@ class Runner:
             if 'standardTPoseGlobalRotations' not in rig:raise ValueError('T pose requires rig rest-basis conversion, not identity native rotations')
             global_rot=np.asarray(rig['standardTPoseGlobalRotations'])[None]
             motion=m.complete(m.local_from_global(global_rot,rig['parents']),np.zeros((1,3)),rig)
+        elif op=='sample_pose':
+            from .derived import sample_pose
+            motion, sampling = sample_pose(self.motion(p['source']), rig, p)
+            sampling['sourceMotion'] = self.output_of(p['source'])['motion.npz']
+            write_json(folder/'pose-sampling.json', sampling)
         elif op=='freeze':
             source=self.motion(p['source']);frame=p.get('frame',round(p.get('fraction',0)*(len(source['root_positions'])-1)))
             motion=m.freeze(source,frame,p['count'],rig)
@@ -471,6 +480,16 @@ class Runner:
                         'curveNamesToAuthor':row['originalCurveNames'],
                         'curvePolicy':row['curveAndNotifyPolicy'],
                         'note':'Retarget full pose and reference together; compute additive once on target rig. Original curve keys/events were not copied.'}
+            if row.get('sampledPosePolicy'):
+                outputs=self.output_of(p['source'])
+                sampling=outputs.get('pose-sampling.json')
+                if not sampling and self.graph['nodes'][p['source']]['op']=='mirror':
+                    parent=self.graph['nodes'][p['source']]['params']['source']
+                    sampling=self.output_of(parent).get('pose-sampling.json')
+                if not sampling or read_json(sampling['path']).get('passed') is not True:
+                    raise ValueError('Independent pose delivery requires its sampling receipt')
+                asset_metadata['poseSamplingReceipt']=dict(file=sampling['path'],sha256=sampling['sha256'],
+                    sourcePoseMotionFile=outputs['motion.npz']['path'],sourcePoseMotionSha256=outputs['motion.npz']['sha256'])
             if row.get('targetGaitPolicy'):
                 outputs=self.output_of(p['source'])
                 gate=outputs.get('gait-validation.json');trajectory=outputs.get('authoring-trajectory.json')
@@ -534,6 +553,8 @@ class Runner:
                     raise ValueError('Walk upper-body posture exceeds its generated Idle reference limits')
         m.save_motion(folder/'motion.npz',motion,rig)
         if op=='deliver':
+            if asset_metadata.get('poseSamplingReceipt'):
+                asset_metadata['poseSamplingReceipt']['deliveredMotionSha256']=file_hash(folder/'motion.npz')
             if asset_metadata.get('airValidationReceipt'):
                 asset_metadata['airValidationReceipt']['deliveredMotionSha256']=file_hash(folder/'motion.npz')
             if 'gaitValidationReceipt' in asset_metadata:

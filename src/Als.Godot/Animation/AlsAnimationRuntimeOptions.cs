@@ -22,6 +22,17 @@ internal static class AlsAnimationRuntimeOptions
         return document.RootElement.GetProperty("enableRootMotion").GetBoolean();
     });
     internal static bool RootMotionEnabled => RootMotionSetting.Value;
+    private static readonly Lazy<FrozenDictionary<string, float>> SecondaryMotionGains = new(() =>
+    {
+        using var document = JsonDocument.Parse(Godot.FileAccess.GetFileAsString("res://assets/config/als_animation_settings.json"));
+        if (document.RootElement.GetProperty("schemaVersion").GetInt32() != 1)
+            throw new ArgumentException("Unsupported ALS animation settings.");
+        return document.RootElement.GetProperty("secondaryMotionRotationGains").EnumerateObject()
+            .ToFrozenDictionary(p => p.Name, p => p.Value.GetSingle(), StringComparer.Ordinal);
+    });
+    // Native source diagnostics retain unity gains. Ordinary Demo tuning uses the same source clock and transaction.
+    internal static IReadOnlyDictionary<string, float>? SecondaryMotionRotationGains =>
+        _demoConfigured && !Has("--native-secondary-motion") ? SecondaryMotionGains.Value : null;
     // Native diagnostic entries keep their authored sampling unless explicitly overridden.
     internal static bool SampleRootMotion => _sampleRootMotion ??= (!_demoConfigured && !OS.GetCmdlineUserArgs().Any(a => a is "--enable-root-motion" or "--disable-root-motion") || RootMotionEnabled);
     internal static bool MantleProgressControl => !SampleRootMotion && !Has("--mantle-legacy-linear");

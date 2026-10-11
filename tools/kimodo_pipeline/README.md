@@ -98,12 +98,18 @@ python tools/produce_als_resources.py inputs
 
 `--rules` 选择风格/数值配置副本；默认不修改当前运行资产。当前配置为 RP v1.1、30 FPS、seed 42、100 steps、3 秒候选。Kimodo 源码、骨架文件、模型及本地文本编码器权重字节进入缓存身份。推理沿用本机 `.cache/huggingface/hub` 与可用的 ModelScope Llama 路径，使用已有权重离线运行；缺少缓存会明确失败，可先按 Kimodo 自身安装流程准备。不会默默切换 checkpoint 或远程 encoder。
 
+`motionPromptOverrides` 按 `semanticName` 配置动作提示词；优先级为分支显式 prompt、规则覆盖、合同 `promptDraft`。Land 的蹲伏深浅和 Roll 的贴地表演先通过这份风格配置调整，不新增固定屈膝角度或骨盆高度门禁。Light／Heavy 及其 Additive 仍分别从同一母动作派生；改 prompt 后必须重新生成并完成现有转换、最终 FBX 回读、Godot 导入和相关实际运行，观察结果不等同于完整生产验收。
+
 ## 哪些节点生成，哪些节点派生
+
+缺失的静态步态参考姿态现在可从上游生成候选独立采样；`--scope derived --base-pack <resource-pack.json> --upstream-receipts <receipts.json>` 补缺并保留已有源交付，不运行新 diffusion。`--upstream-receipts` 可重复传入；默认继续完整转换和 Godot 检查，`--runtime-case` 可选相关场景。采样不会批准失败的循环或取消其门禁，详见[采样相位、来源校验和完整交付契约](../../docs/architecture/kimodo-derived-resources.md)。
 
 | 节点操作 | 行为 |
 | --- | --- |
 | generate | 在依赖完成后提取姿态，构建合法 root2d/fullbody/hand/foot 数值条件，调用本地 Kimodo CLI |
 | freeze | 按 frame 或 fraction 提取一帧并重复；Stand/Crouch 归零 XZ 和髋部朝向 |
+| sample_pose | 从真实生成候选的原生周期相位采样，去数值平面路径，保留局部旋转及竖直变化；独立静态 receipt 不代表循环通过 |
+| reuse_motion | 显式复用上游执行 receipt，验证文件、rig、时间域和适用周期检查；新图保留完整来源证据 |
 | mirror | 已验收步态在原生中性骨架坐标反射身体和行进轨迹，重测同步相位；Overlay 等其他动作沿用 BasePose 反射 |
 | native_gait_reference | 校验原版 payload 字节，将原版姿态／脚趾目标投影成 SOMA 数值约束参考；禁止直接交付 |
 | periodic_repair / gait_cycle | 按原生周期执行有界拟合／接触 IK，再测实际 FK、交替支撑、滑步和接缝，失败阻断派生 |

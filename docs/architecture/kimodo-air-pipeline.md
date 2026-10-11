@@ -8,6 +8,8 @@
 
 Jump、Land、Ragdoll 恢复保留各自现有分支；此策略不声称已覆盖全部空中动作。
 
+三种下落生成 prompt 均描述每个周期中段双膝与髋部弯曲、短暂蹲缩，随后自然伸腿回到起始空中姿态。Fall 保留放松手臂，Fall_Fast 保留保护性展臂，Flail 保留双臂挥动。这里的蹲缩是空中收腿动作；髋部高度、全身／Hips 条件和既有源／目标门禁继续约束输出。文字指定中段不等于精确时间键控制，实际生成是否出现清晰蹲缩需由新批次验证。
+
 ```powershell
 # 只读检查；默认自动选择 air_rules.json
 python tools/produce_als_resources.py inspect --scope air
@@ -39,6 +41,8 @@ flowchart LR
 从固定 `assets/config/refactored_animation_sources.json` 读取对应原版动作、校验文件 SHA256 和骨架语义摘要，逆用现有中性姿态对齐与坐标转换得到 SOMA77 参考。原版只提供条件，不是生成交付物。
 
 提示词描述持续直立悬空、对应手腿动作和稳定髋部高度。使用原周期重复的全身条件和独立 Hips 三维 end-effector 条件，包含竖直 Y 与全身方向；每个条件不超过 19 个采样帧，遵循真实 Kimodo SDK 的 `local_joints_rot` / `root_positions` 格式。没有地面脚部接触约束。
+
+中段蹲缩由生成节点的 `airCrouch` 条件明确控制，策略为 `air-midcycle-crouch-v1`。在两条原生腿各自的膝盖弯曲平面内，用每周期 `sin(π·phase)²` 权重增加髋部收腿 35°、膝盖弯曲 30°；中段最大，两端回到原姿态。修改的是传给 Kimodo 的稀疏全身条件，不是生成后的动作替换。原参考只读，Hips XYZ、骨长、上半身和端点保持；条件参数参与生成缓存身份，并写入 `air-constraints.json`。原源／目标几何与周期门禁不放宽。仅改变 prompt 时，密集参考条件可能使实际动作几乎不变；必须检查真实生成和最终交付中的屈膝曲线。
 
 实际生成时复用原有模型、缓存、seed 与 diffusion runner；各候选、条件文件和回执保存独立摘要。禁止把带 `constraint-reference.json` 的原版参考直接作为 `air_cycle` 的生成输入。测试绑定仍明确记录 `boundInput`，其结果不能作为真实扩散验收。
 

@@ -77,13 +77,40 @@ class AirTests(unittest.TestCase):
             for name in air.SEMANTICS:
                 with self.subTest(skeleton=type(skeleton).__name__,semantic=name):
                     reference,_=air.native_reference(name,self.rig)
-                    conditions,_=air.materialize_constraints(dict(semantic=name,airPolicy=air.POLICY,seconds=3,fps=30),reference,self.rig)
+                    conditions,_=air.materialize_constraints(dict(semantic=name,airPolicy=air.POLICY,airCrouch=air.CROUCH_CONDITION,seconds=3,fps=30),reference,self.rig)
                     with tempfile.TemporaryDirectory() as d:
                         path=Path(d)/'conditions.json';write_json(path,conditions)
                         parsed=load_constraints_lst(str(path),skeleton)
                         self.assertEqual(len(parsed),2)
                         self.assertEqual(parsed[1].joint_names,['Hips'])
                         np.testing.assert_allclose(parsed[1].root_y_pos.cpu().numpy(),np.asarray(conditions[1]['root_positions'])[:,1],atol=1e-6)
+
+    def test_crouch_conditions_increase_midcycle_knee_flexion_without_changing_hips_or_endpoints(self):
+        from .motion import fk
+        names={n:i for i,n in enumerate(self.rig['jointNames'])}
+        for name in air.SEMANTICS:
+            reference,_=air.native_reference(name,self.rig)
+            before=reference['local_rot_mats'].copy()
+            conditions,receipt=air.materialize_constraints(dict(semantic=name,airPolicy=air.POLICY,
+                airCrouch=air.CROUCH_CONDITION,seconds=3,fps=30),reference,self.rig)
+            frames=np.array(receipt['fullBodyFrames']);period=len(reference['root_positions'])-1
+            native=reference['local_rot_mats'][frames%period]
+            local=Rotation.from_rotvec(np.array(conditions[0]['local_joints_rot']).reshape(-1,3)).as_matrix().reshape(native.shape)
+            roots=np.array(conditions[0]['root_positions'])
+            np.testing.assert_allclose(roots,reference['root_positions'][frames%period])
+            np.testing.assert_array_equal(reference['local_rot_mats'],before)
+            endpoints=frames%period==0
+            np.testing.assert_allclose(local[endpoints],native[endpoints],atol=1e-12)
+            _,old=fk(native,roots,self.rig);_,new=fk(local,roots,self.rig)
+            for side in ('Left','Right'):
+                hip,knee,ankle=[names[side+n] for n in ('Leg','Shin','Foot')]
+                def bend(points):
+                    a=points[:,hip]-points[:,knee];b=points[:,ankle]-points[:,knee]
+                    return 180-np.rad2deg(np.arccos(np.clip(np.sum(a*b,axis=1)/
+                        (np.linalg.norm(a,axis=1)*np.linalg.norm(b,axis=1)),-1,1)))
+                expected=air.CROUCH_CONDITION['kneeFlexionDegrees']*np.sin(np.pi*(frames%period)/period)**2
+                np.testing.assert_allclose(bend(new)-bend(old),expected,atol=1e-6)
+            np.testing.assert_allclose(new[:,names['Hips']],old[:,names['Hips']])
 
     def test_bounded_source_to_target_cycles_and_real_fbx_readback(self):
         for name in air.SEMANTICS:

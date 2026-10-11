@@ -35,11 +35,15 @@ public partial class CharacterRagdollRecoverySmoke : Node
     private bool _checkedOverlaySwitch;
     private Vector3 _exitPosition;
     private Input.MouseModeEnum _mouse;
+    private bool _auditRagdoll;
+    private bool _legacyGroundCheckpoint;
     public override void _Ready()
     {
         try
         {
             var args = OS.GetCmdlineUserArgs(); _hz = int.Parse(args.FirstOrDefault(a => a.StartsWith("--hz="))?[5..] ?? "60");
+            _auditRagdoll = args.Contains("--audit-ragdoll");
+            _legacyGroundCheckpoint = args.Contains("--legacy-ground-checkpoint");
             Require(_hz is 30 or 60 or 120, "Unsupported rate."); Engine.PhysicsTicksPerSecond = _hz;
             _failure = args.Contains("--failure"); _mouse = Input.MouseMode;
             _interrupt = args.Contains("--interrupt");
@@ -102,6 +106,8 @@ public partial class CharacterRagdollRecoverySmoke : Node
             Require(character.BodyHistory?.Failure is null && (_stage == 6 || !character.IsPoseFrozen) && _demo.ErrorCount <= (_failure ? 1 : 0) + expectedClassification,
                 $"Recovery runtime failed: {character.BodyHistory?.Failure} frozen={character.IsPoseFrozen} errors={_demo.ErrorCount}");
             _stageTicks++;
+            if (_auditRagdoll && (_stageTicks == 1 || _stage == 1 && _stageTicks % (_hz / 2) == 0))
+                AuditRagdoll(character, motor);
             if (_entryFailure && character.AnimationRecoveryAttempts > 0)
             {
                 Require(_stage == 1 && character.RagdollSimulation is null && character.LatestMotorInput.MovementAction.RequiresRagdoll,
@@ -160,6 +166,11 @@ public partial class CharacterRagdollRecoverySmoke : Node
             if (_stage == 1)
             {
                 if (character.RagdollSimulation is not { } simulation || simulation.CompletedSteps < (_air ? 2 : _hz * 2)) return;
+                // Two seconds is a minimum observation period, not a deadline
+                // for an unconstrained physical pose to enter the pelvis probe.
+                // The unchanged whole-scenario timeout still rejects no-ground cases.
+                if (!_air && !motor.RagdollGrounded && !_legacyGroundCheckpoint) return;
+                if (_auditRagdoll) AuditRagdoll(character, motor);
                 Require(motor.RagdollGrounded != _air, $"Ragdoll ground state differs from exit scenario: cycle={_cycles}, position={motor.GlobalPosition}.");
                 if (!_air && _automatic is not null)
                 {
@@ -283,6 +294,28 @@ public partial class CharacterRagdollRecoverySmoke : Node
         catch (Exception e) { Fail(e); }
     }
     private void Next(int stage) { _stage = stage; _stageTicks = 0; }
+    private void AuditRagdoll(AlsP3Character character, AlsCharacterMotor motor)
+    {
+        var collision = motor.GetNode<CollisionShape3D>("AlsCapsuleCollision");
+        var capsule = (CapsuleShape3D)collision.Shape;
+        var floor = _demo.GetNode<CollisionShape3D>("World/StartFloor/CollisionShape3D");
+        var simulation = character.RagdollSimulation;
+        var scale = collision.GlobalBasis.Scale.Abs();
+        var radius = capsule.Radius * Mathf.Min(scale.X, scale.Z);
+        var halfHeight = Mathf.Max(radius, capsule.Height * scale.Y * .5f);
+        var floorTop = floor.GlobalPosition.Y + ((BoxShape3D)floor.Shape).Size.Y * .5f;
+        GD.Print("RAGDOLL_RECOVERY_AUDIT " + System.Text.Json.JsonSerializer.Serialize(new
+        {
+            tick = _ticks, stage = _stage, stageTicks = _stageTicks, cycle = _cycles, airborne = _air,
+            actor = new[] { motor.GlobalPosition.X, motor.GlobalPosition.Y, motor.GlobalPosition.Z },
+            capsuleHeight = capsule.Height, radius, halfHeight, floorTop,
+            grounded = motor.RagdollGrounded,
+            simulationSteps = simulation?.CompletedSteps,
+            contacts = simulation?.LastContactCount, sleeping = simulation?.Island.IsSleeping,
+            pelvis = simulation is null ? null : new[] { simulation.PelvisPosition.X, simulation.PelvisPosition.Y, simulation.PelvisPosition.Z },
+            pelvisSpeedCmPerSecond = simulation is null ? (double?)null : Math.Sqrt(simulation.PelvisVelocity.LengthSquared),
+        }));
+    }
     private void ArmRecoveryFailure(AlsP3Character character)
     {
         if (!_failure || _failureArmed) return;

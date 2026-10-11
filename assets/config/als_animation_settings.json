@@ -1,4 +1,13 @@
 {
   "schemaVersion": 1,
-  "enableRootMotion": false
+  "enableRootMotion": false,
+  "secondaryMotionRotationGains": {
+    "spine_01": 4.0,
+    "spine_02": 4.0,
+    "spine_03": 4.0,
+    "clavicle_l": 2.0,
+    "clavicle_r": 2.0,
+    "neck_01": 2.0,
+    "head": 2.0
+  }
 }

@@ -1,5 +1,19 @@
 # Lyra 当前目标：可玩的 locomotion 与 ALS/Core 复用（2026-10-04）
 
+2026-10-10 缺失 Kimodo 资源派生：新增上游 receipt 复用与独立静态姿态采样，五个参考姿态及九个 Lean/Acceleration 语义不再等待整个步态周期通过，循环原门禁保持。实际零新 diffusion，新增 18 个语义／32 个身份，与既有 123 个交付组成独立 `als_nonprop_20261010_derived_v2` 诊断包；155 个最终 FBX、14 个目标步态、相关 Python 95/95、Godot 构建／导入／六域绑定及六个普通／方向／蹲站检查通过。112 张 GPU 截图身份及三模式各 28 段原版足底对照、1,706 载荷和 offset Root／骨盆／脚 FK 保持、Air 11/11 通过。Low 静态 9/11，Root 开启及原版蒙皮对照失败；旧活动包复测 Root 开启的 360 帧世界骨骼与新包差异为零，失败保持。十个正常高度／平台案例通过，关闭手锁负对照失败。候选剩余 28 身份／15 语义，整体 `runtime_failed`／`pipeline_complete_rejected`；活动默认保持 Land v4，全蒙皮／人工与完整矩阵验收开放。见[稳定契约](docs/architecture/kimodo-derived-resources.md)与[本批证据和失败边界](docs/verification/2026-10-10-kimodo-derived-resources.md)。
+
+2026-10-10 自动翻滚恢复夹具修正与 Land／Roll 接入：用户质疑后已证实旧固定两秒接地检查会误判，v4／v5 继续模拟即可接地并完成恢复。测试现等待实际接地，保留两秒最短观察、原 22 秒总预算、接地／起身／碰撞／所有权断言；未改生产物理或接地范围。17 个恢复及 5 个相关案例 22/22、额外 30／120 Hz 和 Root 关闭单线程 3/3 通过，无法接地负对照仍超时失败，旧检查反例与历史失败保留。默认已选择 `als_nonprop_20261010_landing_prompt_combined_v4`，新 Land／贴地 Roll 与当前其他资产整合，1,536 载荷及 123 FBX 证据核对、普通无覆盖重启通过。仍为诊断包，完整运行／方向、60 个缺口、全蒙皮／人工／长期／性能验收开放；不新增风格门禁。见[根因、夹具验证和默认接入](docs/verification/2026-10-10-ragdoll-recovery-fixture.md)。
+
+2026-10-10 Land／Roll prompt 修订：按用户要求，通过可配置提示词加强落地屈膝／蹲伏和贴地翻滚，不新增固定角度／蹲深的风格门禁。六轮、10 次真实 diffusion 均完成转换、123 个最终 FBX 回读与 Godot 导入；Land 缓冲描述加强，Roll 仅部分文字／seed 组合能完整贴地翻滚。v4／v5／v6 均有自动 Roll→Ragdoll 恢复第二循环失败，最后一轮相关运行 3/4；保留失败和保持检查，默认仍为既有 Air crouch 包。最终 Roll 文案采用能产生完整翻滚的 v4 描述，尚未满足接入条件；下一步继续候选探索并定位恢复失败，完整生产／人工验收保持开放。见[实际生成、保持检查和失败边界](docs/verification/2026-10-10-kimodo-landing-prompt-regeneration.md)。
+
+2026-10-10 不同高度下落诊断：当前默认在 3／5 m 触地后自动 Roll 表演严重错误，实际骨盆抬到约 1.8 m／身体未翻滚；同帧原始对照正常贴地，动作路由、Montage 时间／权重及触地前胶囊物理一致。旧 Roll 生成源缺少翻滚表演，Land 缓冲偏浅也仍开放。新增普通 owner 的高度观察入口，14 轮完成／2,806 帧／118 张 GPU 截图，另 4 轮 Ragdoll 图采样覆盖失败保留，去掉可选采样的 8 m 两包实际物理观察完成。本轮未修资产／更改默认或规则，未做全矩阵／全蒙皮验收；后续需分别修 Land／Additive 与 Roll 生成条件和质量门禁。见[高度／路由／动作根因及失败边界](docs/verification/2026-10-10-kimodo-drop-height-diagnosis.md)。
+
+2026-10-10 Air 中段蹲缩真实生成与导入：prompt-only 对照实际变化很小，第二轮补充周期中段髋部收腿 35°／膝盖弯曲 30°的稀疏姿态条件，真实生成三个候选、交付 16 身份。最终组合 `als_nonprop_20261010_air_crouch_combined_v2` 的三种下落中段屈膝峰值约 124°／110°／111°，六份最终目标均有明确变化；123 FBX 全键回读、1,536 载荷摘要、107 个非 Air 运行姿态和 70 个道具保持检查通过。相关 Python 57/57、游戏案例 5/5、最终 Air 11/11，2,144 观察帧／22 张 GPU 截图，三 Hz 单并行逐帧一致且旧新胶囊物理一致。默认已接入新诊断包，普通无覆盖重启通过。60 个缺口、完整方向／运行矩阵及此前 Mantle 开放失败保持；Air 全蒙皮／人工／长期／性能验收未关闭。第一轮中止证据、完整包装非零及原门禁保留。见[本批生成、对照和默认接入证据](docs/verification/2026-10-10-kimodo-air-crouch-regeneration.md)。
+
+2026-10-10 呼吸叠加幅度：普通 ALS Demo 的 V4 SecondaryMotion 动态旋转调节已接入，三段脊柱 4 倍、双肩／颈／头 2 倍，沿用原源时钟与角色事务。Release 相关 25/25、优化构建及真实三 Hz／60 Hz 单并行／GPU 对照通过；当前 Default 待机的 Root／骨盆／双脚和最终蒙皮脚底逐帧保持。仅完成呼吸幅度增强，未新增待机变体或重新生成资产；完整动作混合、长时间、人工与生产门禁仍开放。见[实际验证与边界](docs/verification/2026-10-10-secondary-motion-variation.md)。
+
+2026-10-10 Air prompt 中段蹲缩：按用户要求，Fall／Fall_Fast／Flail 三种下落 prompt 加入每周期中段屈膝屈髋、短暂蹲缩后自然伸腿回到起始空中姿态，保留各自手臂风格和原三维条件／门禁。仅修改提示词并核对独立生产图；当前默认资产未重新生成，动作效果待新批次验证。见[prompt 修改与检查](docs/verification/2026-10-10-kimodo-air-crouch-prompt.md)。
+
 2026-10-10 Air 真实生成与默认接入：独立管线实际生成 Fall／Fall_Fast／Flail 三个候选、交付 16 身份，与当前其他资产组成 `als_nonprop_20261010_air_combined_v1`。123 个最终 FBX 和 1,536 个载荷摘要通过，107 个非 Air 运行姿态及 70 个道具资产保持。Air 最终 Godot 11/11、2,144 观察帧／1,334 空中帧／22 张 GPU 截图、三 Hz 单线程／并行逐帧一致；旧包同场景被拒绝，新旧胶囊物理前 50 帧完全相同。修正三个旧 Air 夹具的包配置、逻辑骨架和绝对／additive 预期接口，原断言保持。相关 16 项运行断言及普通无覆盖重启通过，默认指针已选择新诊断包。仍有 60 个非道具缺口，完整方向范围未全选，既有 Mantle Root 开启／取消姿态和负对照失败保留，整体运行／正式生产门禁未关闭；人工动作、Air 全蒙皮、长时间及性能验收开放。见[本轮证据与边界](docs/verification/2026-10-10-kimodo-air-integration.md)。
 
 2026-10-10 独立 Air pipeline：已将 Fall／Fall_Fast／Flail 与 Air Lean 制作独立于平面移动和 Mantle，新增 `--scope air` 与专用 PowerShell 入口，32 节点／3 个生成分支／16 身份；全非道具图复用同一分派。专用三维条件、源语义与有界周期制作、Air Root/Pelvis 所有权、目标 FK 及交付／运行前门禁已接入。相关 101/101 Python、真实 Kimodo 30／77 骨六组条件解析、三个受控 FBX 全键回读通过，旧三类错误源／目标被拒绝。当前默认及资产保持，本次没有新 diffusion／资源包／Godot／人工蒙皮验收；下一步以独立入口真实生成并执行完整交付与游戏检查，不能将受控夹具视为生成交付。见[稳定契约](docs/architecture/kimodo-air-pipeline.md)与[实际证据和验收边界](docs/verification/2026-10-10-kimodo-air-pipeline.md)。
@@ -10,11 +24,17 @@
 
 2026-10-10 当前中高攀爬：实际生成 High／两个 Low，六个交付身份通过源与目标门禁；与其余 117 个最新动作组成 `als_nonprop_20261010_mantle_high_combined_v5`，123 个最终 FBX 回读和 1,524 个载荷摘要通过。新增目标蒙皮前移曲线、组件空间手部过渡 IK 和按实际台面高度提前完成的准备段抬升，保持资产 Root／Pelvis 与统一时钟。真实 Godot 的 1.2–2 m、两侧 Low 支撑及移动 High，三 Hz 共 21/21、8,820 帧和 300 张 GPU 截图通过原 2 cm 蒙皮门槛，支撑残差为零。普通默认已选择本轮生成包，无环境覆盖重启与实际游戏窗口确认。仍为诊断包：60 个非道具缺口、Root 开启／原版对照、取消后的姿态及完整矩阵／人工／性能验收继续开放；不得把正常中高范围通过升级为完整生产验收。详细结果与失败见[中高攀爬验证](docs/verification/2026-10-10-medium-high-mantle.md)。
 
+2026-10-10 最新资产默认整合：应用户要求，新建 `als_nonprop_20261010_latest_combined_v1`，整合最新 117 个非 Mantle 交付与四个专用手部修复 Low 身份。121 个最终 FBX 全关键帧回读、十个 Walk 与四个 Low 目标门禁通过；121 个 runtime raw 与各自最新交付语义一致，1,501 个载荷摘要及源包保持。默认指针已选择统一诊断包，Godot 导入／P2B／六域绑定和普通无覆盖重启通过，已打开游戏。62 个未交付身份继续原版回退，包括 Run 与 High；旧通用 High 缺少当前专用合同，不从失败／旧包补入。完整基本矩阵 64/71：恢复旧失败、六个渲染 WASAPI 失败及前进停止 tick 35 捕获失败保留。独立 6,840 帧通过身份／冻结输入检查，但新统一包标准 Low 两侧出现约 1.1–1.2 cm 支撑不可达残差，左手 60 Hz 蒙皮 2.031 cm；移动 Low 也未过，不能沿用单独 Mantle 包的九项通过。0.75 m 短台阶／销毁联合通过，取消、Root 开启和原版 High 仍失败，整体 `runtime_failed`。下一步先定位统一基础姿态／角色组合的支撑可达性，再推进其他缺口；完整生产、人工与性能验收未关闭。见[默认整合与实际证据](docs/verification/2026-10-10-latest-generated-default-pack.md)。
+
 2026-10-10 Mantle 生产后手部 IK：已用真实目标蒙皮修复生成指节、接近／释放手臂和固定掌面下的过渡姿态，保留 Root/Pelvis、腿、躯干与骨长，重出四个 Low 身份及最终曲线／FBX。Godot 标准 1 m 两侧三 Hz／单并行／GPU 的九项 Root 关闭检查通过，整段峰值 ≤1.531 cm；移动 Low 通过，峰值 1.469 cm。42 项 Python 与四个最终 FBX 回读通过，6,840 个诊断帧身份和新 830／旧 829 载荷完整性通过，普通 Demo 使用新包启动。剩余失败保留：0.75 m 进动作混合 3.516 cm、取消后的足部 20.090 cm、Root 开启 3.320 cm，以及原版 High 回退；关闭手锁的负对照也失败。新包仍诊断，默认指针保留旧 v4。下一步处理短台阶的进动作混合／取消姿态与 Root 开启接触，继续生成合格 High；完整生产、整动作美术与性能验收未关闭。见[稳定修复合同](docs/architecture/kimodo-mantle-hand-skin-repair.md)与[本批实际导入和游戏证据](docs/verification/2026-10-10-mantle-hand-skin-repair.md)。
 
 2026-10-09 Mantle 专用曲线与固定支撑：已烘焙前移／抬升、剩余高度、双手接触权重和平台局部固定 wrist／palm 锚点，复用 Core Distance Matching 与双骨 IK，使用物理 montage 的同一时钟和角色事务。真实静态三 Hz／单并行／GPU 六项启用支撑控制均通过，移动／高度／支撑中取消与销毁等七项运行／策略通过；5,940 帧身份与各次包／829 载荷完整性保留。候选支撑手腕漂移约 0.0004 mm，但支撑指节仍穿模约 5.11 cm，释放峰值约 9.08 cm，完整蒙皮门禁未过。Release Core／帧交换／零分配／双骨 IK 61/61、Import motion/contact 7/7 和原 hand IK 16/16，Import 相关集 94/99 的 5 个已有摘要失败保留；默认完整 pipeline 已接入 Mantle 接触／蒙皮门禁分派并保留独立检查。当前仍诊断包，下一步修手指接触姿态和释放／提腿几何，重新验收，不将曲线／wrist 固定通过视为全动作通过。见[稳定合同](docs/architecture/als-mantle-contact-control.md)及[本批验证和失败证据](docs/verification/2026-10-09-mantle-contact-progress-curves.md)。
 
+2026-10-09 Mantle 朝向／穿模复核：用户指出截图缺陷后，确认 Root 关闭时的 mesh 基底抵消遗漏，已修 Core，真实 Low actor yaw 由约 82.5° 恢复为 0°；四组新增回归旧代码失败、修复后 Mantle Core 33/33 通过。完整蒙皮仍穿模：候选 Root 关闭／开启峰值约 19.63／9.08 cm，原版约 22.33／3.99 cm。复用脚本已增加 actor yaw 和蒙皮／平台交叠门禁，v3 运行及朝向各 7/7、几何 0/7、总结果失败；120 张 GPU 截图、2,700 帧身份和包／829 载荷／配置／程序集完整性均保留。额外 moving／high／cancel／根关闭策略场景通过；Import Mantle 93/98，5 项摘要不匹配失败。保持诊断包与失败证据。下一步修程序化抬升与姿态同步，以及候选释放／提腿阶段的身体避障，随后重做接触和完整矩阵验收。见[修复与实际蒙皮证据](docs/verification/2026-10-09-mantle-runtime-orientation-penetration.md)。
+
 2026-10-09 Mantle 可复用游戏场景：脚本直接运行既有 `mantling_demo_smoke.tscn`，不使用 computer-use。原 v2 的 7/7 仅通过当时的运行／截图采集断言，漏掉朝向和穿模，已由上条纠正。保留 Low 三种物理 Hz、根运动开关、单线程及候选／原版各 60 张 GPU 截图、829 载荷／配置／程序集完整性证据；首轮程序集变更失败仍保留。见[原场景检查记录及纠正](docs/verification/2026-10-09-kimodo-mantle-scene.md)。
+
+2026-10-09 默认鼠标行为：普通 Demo 启动时保持可见、自由指针，只有主动按 Esc 才捕获；失焦释放实际鼠标模式，回到窗口不自动捕获。优化构建、真实 Godot headless 360 帧键鼠回归与 P3 输入场景通过；未执行图形窗口人工焦点／悬停验收。见[修复与验证](docs/verification/2026-10-09-default-mouse-capture.md)。
 
 2026-10-09 Mantle 游戏测试：应用户要求，默认活动指针切到 Mantle v4 诊断包（四个 Low 替换身份，其余及 High 为原版），保留旧 v2 指针备份；829 个载荷摘要与普通 Demo 无环境覆盖启动通过，已打开真实游戏窗口。人工测试及完整生产验收仍开放，未合并旧 v2 locomotion。见[指针与启动记录](docs/verification/2026-10-09-kimodo-mantle-active-pointer.md)。
 
@@ -22,12 +42,9 @@
 
 2026-10-09 Mantle 实际生成：四轮、12 次实际扩散对照，最新 v4 两种 Low 的四个 V4/Refactored 身份通过源/目标门禁、Root/接触曲线及最终 FBX 回读；High 手掌与结束双脚通过，2.433 s 的 Pelvis 路径偏差仍为 16.434 cm，超过原 15 cm 门槛，拒绝交付。补充逐帧 Hips 和最多 0.25 s 间隔的全身条件，修正 High 少一帧；关闭 SDK 后处理对照更差，保留默认原生后处理。177 项 Python 回归、最新 17 项 Mantle 场景通过，实际新 Low 渲染 60 张并有限查看三帧；首轮完整矩阵 69/71，恢复中断与松键渲染仍失败。零交付分支显式受阻，缓存旧 worker 的纯 fallback 验证已作废。179 个非道具身份缺失，包仍诊断，活动 v2 指针保持；下一步解决 High 结束阶段下沉、额外运行失败及人工视觉验收，不能放宽门禁或以参考夹具替代生成。见[稳定合同](docs/architecture/kimodo-mantle-export-policy.md)、[受控验证](docs/verification/2026-10-09-kimodo-mantle-export-policy.md)和[实际生成证据](docs/verification/2026-10-09-kimodo-mantle-generation.md)。
 
-2026-10-09 新攀爬资产合同分析：真实 UE5.8.1 读取 GASP 的 8 个 Sequence、7 个 Montage，确认 Root Motion、`attach`/FrontLedge 三维对齐及相关曲线；当前诊断包 Mantle 存在高度/起点失配、Pelvis Z 残差压平、支撑手语义与接触失配，原曲线时序尚未重新适配。后续先关闭生成接触与 Root/Pelvis 合同，再扩展现有 Core 的 Emote-only Warping 配置。仅资产读取/离线分析，未修复或重新验收。见[分析与数值证据](docs/verification/2026-10-09-mantle-asset-contract-analysis.md)。
+2026-10-09 资源扫描优化：编辑器只保留原版 ALS/原版 raw、Lyra、当前活动包及显式候选；历史生成包使用 `.gdignore` 保留磁盘载荷。完整 pipeline 导入前自动纳入候选。缓存文件由 32403 降至 4214、FBX 4766 至 530、重复 UID 警告 141 至 0；单次 headless 编辑器 11.369s 至 4.909s，不代表 GUI 冷启动基准。原版与当前包普通 Demo 有限启动通过，完整目标及诊断包质量门禁保持。见[范围契约](docs/architecture/godot-resource-scan-scope.md)和[本批验证](docs/verification/2026-10-09-godot-resource-scan-scope.md)。
 
-2026-10-09 Mantle 朝向／穿模复核：用户指出截图缺陷后，确认 Root 关闭时的 mesh 基底抵消遗漏，已修 Core，真实 Low actor yaw 由约 82.5° 恢复为 0°；四组新增回归旧代码失败、修复后 Mantle Core 33/33 通过。完整蒙皮仍穿模：候选 Root 关闭／开启峰值约 19.63／9.08 cm，原版约 22.33／3.99 cm。复用脚本已增加 actor yaw 和蒙皮／平台交叠门禁，v3 运行及朝向各 7/7、几何 0/7、总结果失败；120 张 GPU 截图、2,700 帧身份和包／829 载荷／配置／程序集完整性均保留。额外 moving／high／cancel／根关闭策略场景通过；Import Mantle 93/98，5 项摘要不匹配失败。保持诊断包与失败证据。下一步修程序化抬升与姿态同步，以及候选释放／提腿阶段的身体避障，随后重做接触和完整矩阵验收。见[修复与实际蒙皮证据](docs/verification/2026-10-09-mantle-runtime-orientation-penetration.md)。
-
-2026-10-09 默认鼠标行为：普通 Demo 启动时保持可见、自由指针，只有主动按 Esc 才捕获；失焦释放实际鼠标模式，回到窗口不自动捕获。优化构建、真实 Godot headless 360 帧键鼠回归与 P3 输入场景通过；未执行图形窗口人工焦点／悬停验收。见[修复与验证](docs/verification/2026-10-09-default-mouse-capture.md)。
-2026-10-09 Walk/Idle 上身一致性：新增放松肩膀、手臂贴身和小幅前后摆动提示词，修正原版参考到SOMA的A/T中性基准不互逆（限定手臂、保留下肢/root），加入实际生成Idle相对作者检查及发布身份/摘要验证。同种子A/B/C/D证实只改提示词无明显改善，修正条件后上臂中位由约66°降至约22–25°。实际重生成前进/左前两个Walk、程序化派生其余侧向，显式复用43个其他成功输入并重跑完整管线；160项Python、10个目标Walk、123个最终FBX回读通过。普通起停4/4进程、2/2脚底对照、152张截图通过，新旧同帧对照中的展臂已改善。完整71场景执行70项通过、246张截图/112张方向帧身份及三模式28段脚底对照通过；自动翻滚接地恢复仍失败，60个非道具源缺失，部分包未启用，默认v8未改。下一步关闭恢复失败与缺失母动作，并扩展种子/上身风格人工验收；不得将本轮Walk改善视作全新包通过。见[上身生成合同](docs/architecture/kimodo-idle-consistent-arms.md)和[生成/转换/截图闭环证据](docs/verification/2026-10-09-kimodo-idle-consistent-arms.md)。
+2026-10-09 Walk/Idle 上身一致性：新增放松肩膀、手臂贴身和小幅前后摆动提示词，修正原版参考到SOMA的A/T中性基准不互逆（限定手臂、保留下肢/root），加入实际生成Idle相对作者检查及发布身份/摘要验证。同种子A/B/C/D证实只改提示词无明显改善，修正条件后上臂中位由约66°降至约22–25°。实际重生成前进/左前两个Walk、程序化派生其余侧向，显式复用43个其他成功输入并重跑完整管线；160项Python、10个目标Walk、123个最终FBX回读通过。普通起停4/4进程、2/2脚底对照、152张截图通过，新旧同帧对照中的展臂已改善。完整71场景执行70项通过、246张截图/112张方向帧身份及三模式28段脚底对照通过；自动翻滚接地恢复仍失败，60个非道具源缺失。应用户要求，活动指针现默认选择 v2 诊断包，且普通 Demo 无环境覆盖启动已验证；包仍为 `diagnostic`、`productionReady=false`，不得视作正式启用或完整验收。下一步关闭恢复失败与缺失母动作，并扩展种子/上身风格人工验收；不得将本轮Walk改善或默认指针切换视作全新包通过。见[默认指针与普通启动验证](docs/verification/2026-10-09-kimodo-idle-arms-default-pointer.md)，[上身生成合同](docs/architecture/kimodo-idle-consistent-arms.md)和[生成/转换/截图闭环证据](docs/verification/2026-10-09-kimodo-idle-consistent-arms.md)。
 
 2026-10-09 目标竖直相位／接触 IK：已按足底周期极值先识别候选支撑，再有界固定骨长 IK，最后执行原有目标门禁；相位/修复失败保留输入交由严格质量检查，避免形成新的前置硬门禁。最新源本批重出125个目标资产，10个Walk几何及ALS协议通过，125个最终FBX逐键回读通过；155项Python和真实原版反例回归通过。前进/左前起停4/4进程、2/2最终脚底对照、152张截图通过。完整71场景已执行，初轮69/71通过；方向测试鼠标干扰及漏采已修正，最终正常绘制112张截图、三模式28段原版脚底对照和角色物理一致性通过。自动翻滚后接地回归已在原版/旧包/新包对照中复现，尚未关闭；新Walk展臂、58个源缺失及2个检查覆盖缺口仍在，默认v8保持。下一步定位翻滚进入物理时的初始接触状态，修正上身参考姿态/约束和缺失母动作；不得将腿部修复局部通过宣称为完整新包验收。见[算法合同](docs/architecture/kimodo-target-vertical-phase-ik.md)和[本批闭环证据](docs/verification/2026-10-09-kimodo-target-phase-ik.md)。
 
@@ -485,6 +502,8 @@ Main Gather：键鼠/移动/物理与平台快照、动作请求、上一提交�
 交付：用户无需诊断参数即可启动新完整角色链路的普通 Demo，附同输入录像/连续截图及人工待签收表。
 
 ## R6：动作、Ragdoll 与相机剩余收尾
+
+2026-10-09 新攀爬资产合同分析：真实 UE5.8.1 读取 GASP 的 8 个 Sequence、7 个 Montage，确认 Root Motion、`attach`/FrontLedge 三维对齐及相关曲线；当前诊断包 Mantle 存在高度/起点失配、Pelvis Z 残差压平、支撑手语义与接触失配，原曲线时序尚未重新适配。后续先关闭生成接触与 Root/Pelvis 合同，再扩展现有 Core 的 Emote-only Warping 配置。仅资产读取/离线分析，未修复或重新验收。见[分析与数值证据](docs/verification/2026-10-09-mantle-asset-contract-analysis.md)。
 
 - [ ] **通用 P5A**：完成源通知与消费者、ActionPlayer/Slot 竞争、动作生命周期、同步与根运动在完整角色里的统一验证；音频消费者暂缓。
 - [x] **Mantle 生产玩法接入**：地面空格优先翻越、空中自动抓边；原前向/顶部/容身探测与高度/方向/速度门槛、原设置与动画、RootMotionSource 时间、物理 Montage seek、同步 branching/脚步通知及 PostLocomotion 槽已接普通 Demo。支持相对移动/旋转平台、X 取消与目标销毁转 Ragdoll；主线程胶囊、候选动画和最终骨骼沿原提交机制。场景新增三个标识台。见 [验证记录](docs/verification/2026-09-26-mantling-demo.md)。

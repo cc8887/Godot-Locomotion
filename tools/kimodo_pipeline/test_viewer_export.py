@@ -14,6 +14,25 @@ from .viewer_export import preview_motion, export_batch
 
 
 class ViewerExportTests(unittest.TestCase):
+    def test_mantle_source_gate_is_visible_and_hash_checked(self):
+        source,rig=walking_fixture(seconds=2.)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);run=root/'artifacts/run';run.mkdir(parents=True)
+            rig_file=run/'rig.json';rig_file.write_text(json.dumps(rig),encoding='utf-8')
+            motion_file=run/'motion.npz';save_motion(motion_file,source,rig)
+            gate_file=run/'mantle-validation.json';gate_file.write_text(json.dumps(dict(passed=True)),encoding='utf-8')
+            def output(path):return dict(path=str(path),sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+            graph={'nodes':{'motion:Mantle_High':{'params':{'semantic':'Mantle_High','source':'candidate:Mantle_High'}}}}
+            receipts={'rig:soma':{'outputs':{'rig.json':output(rig_file)}},
+                'motion:Mantle_High':dict(op='mantle',identity='one',outputs={'motion.npz':output(motion_file),'mantle-validation.json':output(gate_file)})}
+            result=export_batch(graph,receipts,run_dir=run,root=root)
+            entry=json.loads(Path(result['index']).read_text(encoding='utf-8'))['entries'][0]
+            self.assertTrue(entry['gatePass'])
+            self.assertEqual('源检查通过',entry['qualification'])
+            gate_file.write_text(json.dumps(dict(passed=False)),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'gate receipt changed'):
+                export_batch(graph,receipts,run_dir=run,root=root)
+
     def test_preview_preserves_first_frame_origin_timing_and_physical_fk(self):
         source,rig=walking_fixture(seconds=2.)
         source['root_positions'] += [2.,0.,-3.]

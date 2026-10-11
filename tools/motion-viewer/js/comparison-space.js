@@ -9,6 +9,15 @@ export const COMPARISON_SPACE = Object.freeze({
 
 export const isRootBone = (name) => /^(root|__viewer_root__)$/i.test(name);
 
+// ALS component tracks and exported FBX have different handedness. The FBX
+// writer reflects local Y (including rotations); a Z-up rotation alone cannot
+// put both representations in the same comparison space.
+export function displayTransform(contentUp, contentSpace, convention) {
+  const standZup = convention === 'z' && contentUp === 'z';
+  return { rotationX: standZup ? -Math.PI / 2 : 0,
+    scaleY: standZup && contentSpace === 'als-component' ? -1 : 1 };
+}
+
 export function originMetrics(root, pelvis) {
   const horizontal = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
   return {

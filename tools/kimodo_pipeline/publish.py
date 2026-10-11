@@ -401,6 +401,9 @@ def stage(retarget,output,*,diagnostic=False):
     if not set(jobs)<=expected or (not diagnostic and set(jobs)!=expected):raise ValueError('Incomplete native retarget closure')
     for j in jobs.values():
         if diagnostic:j['_diagnosticConversion']=True
+        if j['contract'].get('sampledPosePolicy'):
+            from .derived import validate_pose_delivery
+            validate_pose_delivery(j)
         for key in ('raw','fbx','bvhPath','motionPath'):
             hash_key=key+'Sha256' if key in ('raw','fbx') else key.removesuffix('Path')+'Sha256'
             if file_hash(j[key])!=j[hash_key]:raise ValueError('Changed retarget input: '+key)

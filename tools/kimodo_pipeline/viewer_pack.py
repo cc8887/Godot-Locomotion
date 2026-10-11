@@ -29,7 +29,7 @@ def preview_raw(raw, skeleton, name, provenance):
     pelvis = world['pelvis'][1][:,:2]; root = world['root'][1][:,:2]
     metrics = dict(maximumRootHorizontalCm=float(np.max(np.linalg.norm(root,axis=1))),
         maximumPelvisRootHorizontalCm=float(np.max(np.linalg.norm(pelvis-root,axis=1))))
-    return dict(format='kimodo-viewer-motion-v1',units='cm',up='z',name=name,
+    return dict(format='kimodo-viewer-motion-v1',units='cm',up='z',coordinateSpace='als-component',name=name,
         fps=raw['frameRateNumerator']/raw['frameRateDenominator'],frameCount=count,
         jointNames=names,parents=skeleton['rawParents'],
         offsetsCm=[r['position'] for r in skeleton['referencePose'][:len(names)]],

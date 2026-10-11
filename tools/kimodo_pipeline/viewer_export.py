@@ -108,13 +108,13 @@ def export_batch(graph, receipts, *, run_dir, label=None, status='authoring_cand
         semantic = graph['nodes'][key]['params'].get('semantic', key.split(':')[1])
         name = names.get(semantic, semantic)
         qualification = '未验收'
-        gate_entry = receipt['outputs'].get('gait-validation.json')
+        gate_entry = receipt['outputs'].get('gait-validation.json') or receipt['outputs'].get('mantle-validation.json')
         gate = None
         if gate_entry:
             if _hash(gate_entry['path']) != gate_entry['sha256']:
                 raise ValueError('Viewer gate receipt changed: '+key)
             gate = json.loads(Path(gate_entry['path']).read_text(encoding='utf-8'))
-            qualification = '源检查通过' if gate.get('pass') else '源检查未通过'
+            qualification = '源检查通过' if gate.get('pass',gate.get('passed',False)) else '源检查未通过'
         source = dict(node=key, identity=receipt['identity'], motionPath=entry['path'],
             motionSha256=entry['sha256'], rigSha256=rig_entry['sha256'],
             phase=phase, qualification=qualification, batch=batch_id, runDirectory=str(run_dir))
@@ -125,7 +125,7 @@ def export_batch(graph, receipts, *, run_dir, label=None, status='authoring_cand
         row = dict(path=rel.as_posix(), url='/authoring-file/'+rel.as_posix(),
             name=name, semantic=semantic, node=key, phase=phase, qualification=qualification,
             kind='source-motion', size=path.stat().st_size, sha256=_hash(path), sidecars=[],
-            source=source, gatePass=None if gate is None else bool(gate.get('pass')))
+            source=source, gatePass=None if gate is None else bool(gate.get('pass',gate.get('passed',False))))
         entries.append(row)
     index = dict(schemaVersion=1, id=batch_id, label=label or run_dir.name, status=status,
         createdUtc=datetime.now(timezone.utc).isoformat(), productionReady=False,

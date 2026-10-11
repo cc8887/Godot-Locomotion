@@ -150,7 +150,8 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
             _committedCurves = new AlsInertialCurve[_names.Length]; _overlayCurves = new AlsInertialCurve[_names.Length];
             _overlayPose = new AlsLocalPose[skeleton.LogicalBoneCount];
             _overlay = new(definition.OverlayPose,_names,skeleton.ReferencePose,character,generation,.01f,-NVector3.UnitX,skeleton.PreciseReferencePose);
-            _sampler = new(definition.OverlaySources,definition.OverlayRawSources,set,_names);
+            _sampler = new(definition.OverlaySources,definition.OverlayRawSources,set,_names,
+                AlsAnimationRuntimeOptions.SecondaryMotionRotationGains);
             _transitions = new(definition.OverlayTransitions,character,generation);
             _layer = new(definition,set,library,_names,Base.CurveNames);
             _upper = new(definition,set,_names,character,generation);

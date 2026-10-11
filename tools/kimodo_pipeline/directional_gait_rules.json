@@ -2,6 +2,12 @@
   "extends": "non_prop_rules.json",
   "reuseModel": true,
   "torchThreads": 2,
+  "sampledGaitPoses": {
+    "Lean_Pose": "Run_Forward",
+    "Run_Forward_Pose": "Run_Forward",
+    "Run_Left_Pose": "Run_Left_Forward",
+    "Crouch_Walk_Pose": "Crouch_Walk_Forward"
+  },
   "locomotionOverrides": {
     "Walk_Left_Forward": {
       "prompt": "A person is walking to their left at a steady pace, taking complete alternating forward strides with hips turned left and shoulders facing forward, with relaxed shoulders and arms hanging close to the body, making small forward and backward swings.",

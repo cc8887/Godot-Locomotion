@@ -5,9 +5,27 @@
 ## 空间与视角
 
 - 共同原点是源资产坐标 `(0,0,0)`，用白色地面十字标记。不得按当前骨盆、首帧骨盆、包围盒中心或运动轨迹中心归零。
-- 当前 Pipeline BVH/FBX 使用 cm；FBX 声明 UnitScaleFactor=1。Z-up FBX 仅绕固定原点做 -90° X 显示转换，Y-up SOMA BVH 保持直立。内部渲染坐标为 Y-up，水平距离使用 XZ；导出记录同时注明源 up 与显示约定。原始朝向诊断模式不应与 Z-up 正常视图混在一份对照中。
+- 当前 Pipeline BVH/FBX 使用 cm；FBX 声明 UnitScaleFactor=1。内部渲染坐标为 Y-up，水平距离使用 XZ；导出记录同时注明源 up、coordinateSpace 与显示约定。原始朝向诊断模式不应与 Z-up 正常视图混在一份对照中。
 - 所有视口使用共同正交相机、相同厘米比例尺；相机固定位置 `(400,250,450)`、目标 `(0,90,0)`、垂直范围 800 cm。只在显式交互时改变视角；旋转/缩放同步应用全部视口，禁止平移至人物中心。重置相机恢复共同预设，加载资产不得自动构图。
 - 不对不同骨架的体型或原始朝向做隐式缩放/朝向拟合。展示差异保留，超出视野时由用户统一缩小视图，不能独立缩放某一栏。
+
+标准对照必须区分轴向与手性。离线 FBX writer 已反射 ALS component 的 Y 分量及相应旋转，目标 raw 则仍为原生 component 通道，不能给二者套同一个显示变换：
+
+| 输入空间 | 原生 up | 原生点 `(X,Y,Z)` 到共同渲染空间 |
+| --- | --- | --- |
+| SOMA 源 BVH／预览 | Y | `(X,Y,Z)` |
+| ALS component raw 预览 | Z | `(X,Z,Y)` |
+| 离线最终 FBX | Z | `(X,Z,-Y)` |
+
+目标 raw pivot 先反射 Y 再绕固定原点转 -90° X；FBX 仅转 -90° X；SOMA 保持原样。轴指示器同步反射，避免标错原生前向。目标预览新增 `coordinateSpace=als-component`；旧版未声明空间的 Z-up motion JSON 按 component 处理，不重写注册资产或摘要。原始数据诊断模式保留原生坐标。
+
+Godot 导入后的模型父级基底与 Viewer 共同坐标不同：当前 ALS 模型原生 +Y 前向落在裸模型的 Godot -X，角色既有 presentation 相对 yaw=-90° 将其对齐到角色前方 -Z。应分别核对骨骼、模型父级和角色显示变换，不能把显示基底差异直接写成资产 Root 的补偿 yaw。
+
+## 离线最终 FBX 播放契约
+
+Three.js 的 ASCII FBX 解析适配只应用于带 `Kimodo ALS offline physical-track writer` Creator 的制品：加载内存中将内联空块展开、缩进转 tab，并将 writer 的骨名/通道编号曲线节点标签映射为解析器需要的 T/R/S。连接 ID、目标属性、时间和值不变，磁盘 FBX 不重写。其他 ASCII／二进制 FBX 保持原数据。
+
+这类最终 FBX 必须解析出 Root、动画 take 和非空轨道，否则直接报错，不允许把参考姿态冒充动画播放。独立 ufbx 回读通过与 Three.js 播放正确是两个检查，后者应通过真实 loader、绑定和共同空间逐键比较目标 raw 与 FBX。见[攀爬朝向与播放验证](../verification/2026-10-09-kimodo-mantle-orientation.md)。
 
 ## 观察内容
 

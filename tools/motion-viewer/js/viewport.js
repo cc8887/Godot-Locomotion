@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from '../vendor/FBXLoader.js';
 import { BVHLoader } from 'three/addons/loaders/BVHLoader.js';
-import { COMPARISON_SPACE, isRootBone, originMetrics } from './comparison-space.js';
+import { COMPARISON_SPACE, isRootBone, originMetrics, displayTransform } from './comparison-space.js';
 import { sourceMotionObject } from './source-motion.js';
-import { normalizeOfflineFbxIndent } from './offline-fbx-text.js';
+import { normalizeOfflineFbxIndent, validateOfflineFbxPlayback } from './offline-fbx-text.js';
 
 export const KIND_COLOR = {
   root: 0xff7a1a, pelvis: 0xff3d81, ik: 0xb44cff,
@@ -24,7 +24,7 @@ export function classifyBone(name) {
 
 // FBX track node names sometimes carry "Model::" / namespace prefixes that
 // do not match the parsed bone names; strip them so PropertyBinding resolves.
-function normalizeTrackNames(object, clips) {
+export function normalizeTrackNames(object, clips) {
   const names = new Set();
   object.traverse((o) => { if (o.name) names.add(o.name); });
   for (const clip of clips) {
@@ -45,7 +45,7 @@ function normalizeTrackNames(object, clips) {
 // three.js PropertyBinding.findNode special-cases the literal name 'root' and
 // would bind 'root.*' tracks to the mixer root object instead of the bone.
 // Renaming bone+tracks to a safe alias keeps root-motion on the actual bone.
-function aliasRootBone(object, clips) {
+export function aliasRootBone(object, clips) {
   let rootBone = null;
   object.traverse((o) => {
     if (!rootBone && o.isBone && /^root$/i.test(o.name)) rootBone = o;
@@ -191,15 +191,15 @@ export class Viewer {
     this._applyOrientation();
   }
 
-  // 显示朝向统一处理：
-  // - 'z'（ALS 原版）：轴指示器旋转 -90°X，蓝色 Z 轴朝上（UE 约定）；
-  //   Z-up 内容（FBX）pivot 旋转 -90°X 直立，Y-up 内容（BVH）保持直立。
-  // - 'y'（原始数据）：一切归零，FBX 按原始 Z-up 躺平、BVH 直立，用于诊断。
+  // Standard comparison: SOMA (X,Y,Z), ALS component (X,Z,Y),
+  // exported FBX (X,Z,-Y). Raw mode preserves each file's native axes.
   _applyOrientation() {
+    const transform = displayTransform(this.contentUp, this.contentSpace, this.upAxis);
     this.axes.rotation.x = this.upAxis === 'z' ? -Math.PI / 2 : 0;
+    this.axes.scale.y = transform.scaleY;
     if (!this.pivot) return;
-    const standZup = this.upAxis === 'z' && this.contentUp === 'z';
-    this.pivot.rotation.x = standZup ? -Math.PI / 2 : 0;
+    this.pivot.rotation.x = transform.rotationX;
+    this.pivot.scale.y = transform.scaleY;
   }
 
   setPlaying(v) {
@@ -276,6 +276,9 @@ export class Viewer {
       const data = await response.json();
       const parsed = sourceMotionObject(data, THREE);
       object = parsed.object; takes = [parsed.clip]; this.contentUp = data.up;
+      // Older preview payloads omitted the space marker. Their Z-up local
+      // channels are still ALS component tracks, never exported FBX channels.
+      this.contentSpace = data.coordinateSpace || (data.up === 'z' ? 'als-component' : 'soma');
     } else if (ext === '.bvh') {
       const res = await new BVHLoader().loadAsync(url);
       if (!res || !res.skeleton || !res.clip) throw new Error('BVH 解析失败');
@@ -286,12 +289,16 @@ export class Viewer {
       if (!object) throw new Error('BVH 无骨骼');
       takes = [res.clip];
       this.contentUp = 'y'; // SOMA BVH 为 Y-up（骨骼沿 +Y 生长）
+      this.contentSpace = 'soma';
     } else {
       const buf = await new THREE.FileLoader()
         .setResponseType('arraybuffer')
         .loadAsync(url);
       this.contentUp = detectFbxUpAxis(buf);
-      object = new FBXLoader().parse(normalizeOfflineFbxIndent(buf), '');
+      this.contentSpace = 'fbx';
+      const normalized = normalizeOfflineFbxIndent(buf);
+      object = new FBXLoader().parse(normalized, '');
+      if (normalized !== buf) validateOfflineFbxPlayback(object);
       takes = object.animations ? object.animations.slice() : [];
     }
 
@@ -462,6 +469,7 @@ export class Viewer {
     const bones = this.keyBones();
     return { timeSeconds: this.action?.time ?? null, durationSeconds: this.clip?.duration ?? null,
       sourceUp: this.contentUp, displayConvention: this.upAxis,
+      coordinateSpace: this.contentSpace,
       ...originMetrics(position(bones.find(b => isRootBone(b.name))),
         position(bones.find(b => classifyBone(b.name) === 'pelvis'))), camera: this.cameraState() };
   }

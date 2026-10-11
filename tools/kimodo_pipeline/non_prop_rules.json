@@ -5,6 +5,11 @@
   "seed": 42,
   "diffusionSteps": 100,
   "candidateSeconds": 3,
+  "motionPromptOverrides": {
+    "Land_Light": "A person lands softly on both feet, bending both knees and lowering the hips into a shallow squat to cushion the landing. Both feet stay planted as the person smoothly rises into a balanced standing stance.",
+    "Land_Heavy": "A person lands on both feet in a deep squat, bending the knees fully and dropping the hips low between the feet to absorb a heavy impact. The feet stay flat on the floor as the person pauses briefly in the deep crouch, then rises smoothly into a balanced standing stance.",
+    "Roll": "A person performs one forward shoulder roll along the ground. Starting in a low crouch, the person tucks the head and knees, rolls over one shoulder and across the upper back, then brings both feet underneath the body and rises into a balanced standing stance."
+  },
   "poseSampleFraction": 0.8,
   "leanDegrees": 10,
   "accelerationDegrees": 6,

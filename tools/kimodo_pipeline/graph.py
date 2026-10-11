@@ -64,6 +64,11 @@ def target_origin_reference(row, rows):
     family, name = row['family'], row['semanticName']
     by_name = {r['semanticName']: r for r in rows if r['edition'] == row['edition']}
     if family == 'gait_pose' or family == 'base_pose' and name == 'Lean_Pose':
+        if row.get('sampledPosePolicy'):
+            from .derived import POSE_POLICY
+            if row['sampledPosePolicy'] != POSE_POLICY:
+                raise ValueError('Unknown independent pose sampling policy')
+            return None
         parent = 'Run_Forward' if name == 'Lean_Pose' else name.removesuffix('_Pose')
         if parent not in by_name:
             parent += '_Forward'
@@ -147,7 +152,7 @@ def build_graph(contracts, rules):
         return key
 
     def generate(key, row, deps, anchors=(), prompt=None, duration=None, path=None):
-        params = dict(prompt=prompt or row['promptDraft'], seconds=duration or rules['candidateSeconds'],
+        params = dict(prompt=prompt or rules.get('motionPromptOverrides', {}).get(row['semanticName']) or row['promptDraft'], seconds=duration or rules['candidateSeconds'],
                       fps=rules['fps'], seed=rules['seed'], model=rules['model'],
                       steps=rules['diffusionSteps'], anchors=list(anchors), rootPath=path,
                       semantic=row['semanticName'])
@@ -424,7 +429,14 @@ def build_graph(contracts, rules):
             else:
                 add(key, 'copy', [candidate], source=candidate)
 
+    from .derived import configure_pose_samples, POSE_POLICY
+    configure_pose_samples(nodes, rules)
+    sampled_names = set(rules.get('sampledGaitPoses', {}))
+    if 'Run_Left_Pose' in sampled_names:
+        sampled_names.add('Run_Right_Pose')
     for row in rows:
+        if row['semanticName'] in sampled_names:
+            row = dict(row, sampledPosePolicy=POSE_POLICY)
         name = row['semanticName']; source = motion(name); ev = row['originalEvaluation']
         if row['family'] in ('fall', 'flail'):
             from .air import POLICY as AIR_POLICY

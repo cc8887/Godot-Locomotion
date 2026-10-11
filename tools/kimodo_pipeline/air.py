@@ -17,6 +17,7 @@ POLICY = 'als-airborne-loop-v1'
 INDEX = 'assets/config/refactored_animation_sources.json'
 SEMANTICS = ('Fall', 'Fall_Fast', 'Flail')
 LEAN_SEMANTICS = ('Air_Lean', 'Air_Lean_Forward', 'Air_Lean_Backward', 'Air_Lean_Left', 'Air_Lean_Right')
+CROUCH_CONDITION = dict(policy='air-midcycle-crouch-v1', hipFlexionDegrees=35., kneeFlexionDegrees=30.)
 # Dedicated, new Air limits; existing gait/mantle/native-oracle gates are untouched.
 LIMITS = dict(torsoTiltDegrees=35., pelvisHeightErrorCm=15., pelvisHeightRangeCm=20.,
               sourceRepairPositionCm=6., sourceRepairRotationDegrees=15.,
@@ -63,18 +64,21 @@ def add_branch(add, generate, nodes, key, row, rules):
     native = 'reference:'+name+':native-air'
     add(native, 'native_air_reference', ['rig:soma'], indexPath=INDEX, semantic=name)
     candidate = 'candidate:'+name
-    behaviour = ('gently moving bent legs and relaxed arms' if name=='Fall' else
-                 'holding arms spread protectively with bent knees' if name=='Fall_Fast' else
-                 'waving arms and kicking bent legs in a controlled airborne flail')
-    prompt = ('A person remains suspended upright in the air, '+behaviour+'. '
-              'Keep the torso upright and the hips at a stable height throughout; '
-              'continue the airborne motion without landing, lying down or standing up.')
+    behaviour = ('with relaxed arms' if name=='Fall' else
+                 'with arms spread protectively' if name=='Fall_Fast' else
+                 'while waving both arms in a controlled flail')
+    prompt = ('A person in an upright airborne falling pose bends both knees and hips '
+              'into a brief crouched tuck midway through each cycle, then smoothly '
+              'extends the legs back to the starting airborne pose, '+behaviour+'. '
+              'The torso stays upright and the hips remain at a stable height '
+              'while the person repeats the motion in the air.')
     period = row['originalTiming']['sampledKeyCount']-1
     fps = row['originalTiming']['frameRateNumerator']/row['originalTiming']['frameRateDenominator']
     if fps != rules['fps'] or period < 8: raise ValueError('Unsupported native Air timeline')
     generate(candidate, row, [native], [], prompt=prompt, duration=max(2., (3*period+1)/fps), path=None)
     nodes[candidate]['params']['airReference'] = native
     nodes[candidate]['params']['airPolicy'] = POLICY
+    nodes[candidate]['params']['airCrouch'] = CROUCH_CONDITION.copy()
     add(key, 'air_cycle', ['rig:soma', candidate, native], source=candidate,
         reference=native, semantic=name, policy=POLICY)
 
@@ -125,8 +129,30 @@ def materialize_constraints(params, reference, rig):
     if count<period+1 or float(reference['fps'])!=params['fps']:raise ValueError('Air conditioning timeline differs')
     frames=np.unique(np.linspace(0,count-1,min(19,count)).round().astype(int))
     indices=frames%period
-    local=reference['local_rot_mats'][indices]
+    local=reference['local_rot_mats'][indices].copy()
     poses=reference['root_positions'][indices]
+    crouch=params.get('airCrouch')
+    if crouch is not None:
+        if crouch != CROUCH_CONDITION:raise ValueError('Unknown Air crouch conditioning policy')
+        # Bend in each native leg's own knee plane, preserving bone lengths and
+        # the immutable reference. The smooth pulse peaks halfway through each
+        # cycle and returns to the native endpoint without changing Hips XYZ.
+        global_rot,points=fk(local,poses,rig)
+        names={n:i for i,n in enumerate(rig['jointNames'])}
+        pulse=np.sin(np.pi*indices/period)**2
+        for side in ('Left','Right'):
+            hip,knee,ankle=[names[side+n] for n in ('Leg','Shin','Foot')]
+            upper=points[:,knee]-points[:,hip];lower=points[:,ankle]-points[:,knee]
+            hinge=np.cross(upper,lower);length=np.linalg.norm(hinge,axis=1)
+            if np.any(length<1e-8):raise ValueError('Air crouch reference has an undefined knee plane')
+            hinge/=length[:,None]
+            parent=rig['parents'][hip]
+            hip_axis=np.einsum('nij,nj->ni',global_rot[:,parent].swapaxes(-1,-2),hinge)
+            knee_axis=np.einsum('nij,nj->ni',global_rot[:,hip].swapaxes(-1,-2),hinge)
+            hip_delta=Rotation.from_rotvec(hip_axis*(-np.deg2rad(crouch['hipFlexionDegrees'])*pulse[:,None])).as_matrix()
+            knee_delta=Rotation.from_rotvec(knee_axis*(np.deg2rad(crouch['kneeFlexionDegrees'])*pulse[:,None])).as_matrix()
+            local[:,hip]=hip_delta@local[:,hip]
+            local[:,knee]=knee_delta@local[:,knee]
     axis=Rotation.from_matrix(local.reshape(-1,3,3)).as_rotvec().reshape(len(frames),len(rig['jointNames']),3)
     # Hips sparse conditions explicitly constrain Y. root2d alone cannot do so.
     conditions=[dict(type='fullbody',frame_indices=frames.tolist(),local_joints_rot=axis.tolist(),root_positions=poses.tolist()),
@@ -134,7 +160,7 @@ def materialize_constraints(params, reference, rig):
                      local_joints_rot=axis.tolist(),root_positions=poses.tolist())]
     return conditions,dict(policy=POLICY,semanticName=params['semantic'],generationFrames=count,
         referencePeriodFrames=period,fullBodyFrames=frames.tolist(),verticalHipFrames=frames.tolist(),
-        groundFootLock=False,referenceOnly=True)
+        groundFootLock=False,referenceOnly=True,crouchCondition=crouch)
 
 
 def _check(checks, name, value, limit):

@@ -12,8 +12,21 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+
 function Resolve-RequiredPath([string]$Path, [string]$Label) {
-    if (-not [IO.Path]::IsPathFullyQualified($Path) -or -not (Test-Path -LiteralPath $Path)) {
+    # [IO.Path]::IsPathFullyQualified is .NET Core-only; PS5.1 fallback: GetFullPath("x")
+    # throws or returns drive-relative absolute for non-rooted input, so compare with the
+    # raw value joined to the current drive to detect a rooted drive/UNC path.
+    $isFullyQualified = $false
+    if (-not [string]::IsNullOrEmpty($Path)) {
+        try {
+            $rootedCheck = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location -PSProvider FileSystem).ProviderPath, $Path))
+            $isFullyQualified = [string]::Equals($rootedCheck, [IO.Path]::GetFullPath($Path), [StringComparison]::OrdinalIgnoreCase)
+        } catch {
+            $isFullyQualified = $false
+        }
+    }
+    if (-not $isFullyQualified -or -not (Test-Path -LiteralPath $Path)) {
         throw "$Label must be an existing absolute path: $Path"
     }
     return (Resolve-Path -LiteralPath $Path).Path
@@ -144,7 +157,7 @@ if ($projectHashBefore -ne (Get-FileHash -LiteralPath $unrealProjectPath -Algori
     throw 'The ready check modified the Unreal project descriptor.'
 }
 $marker = 'GODOT_ALS_EXPORTER_READY'
-if (-not (($readyOutput | Out-String).Contains($marker, [StringComparison]::Ordinal))) {
+if ((($readyOutput | Out-String).IndexOf($marker, [StringComparison]::Ordinal)) -lt 0) {
     throw "Ready marker was not found: $marker"
 }
 Write-Output $marker
