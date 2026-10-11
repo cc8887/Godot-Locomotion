@@ -8,7 +8,7 @@ POLICY = 'target-vertical-extrema-phase-v1'
 
 
 def infer_phases(raw, skeleton, source, *, harmonics=3, low_fraction=.1,
-                 minimum_excursion_cm=1., minimum_window_seconds=.06):
+                 minimum_excursion_cm=1., minimum_window_seconds=.06, contact_mode='flat_sole'):
     name = asset_name(source)
     if name not in PILOTS or PILOTS[name][1] == 'sprint_acceleration':
         raise ValueError('No periodic phase contract: ' + name)
@@ -16,10 +16,13 @@ def infer_phases(raw, skeleton, source, *, harmonics=3, low_fraction=.1,
     length = float(raw['playLength'])
     if period < 8 or length <= 0:
         raise ValueError('Insufficient periodic phase samples')
-    if not 0 < low_fraction < .5 or harmonics < 1:
+    if (not 0 < low_fraction < .5 or not isinstance(harmonics, int)
+            or isinstance(harmonics, bool) or not 1 <= harmonics <= period // 2):
         raise ValueError('Invalid phase smoothing/band parameters')
-    points, _, _ = _sole_geometry(raw, skeleton, PILOTS[name][0], DIRECTIONS[name])
-    heights = points[:-1, :, :, 2].mean(axis=2)
+    points, velocity, _ = _sole_geometry(raw, skeleton, PILOTS[name][0], DIRECTIONS[name])
+    if contact_mode not in ('flat_sole','toe'):
+        raise ValueError('Unknown phase contact mode: '+contact_mode)
+    heights = points[:-1, :, 1, 2] if contact_mode=='toe' else points[:-1, :, :, 2].mean(axis=2)
     if not np.isfinite(heights).all():
         raise ValueError('Non-finite vertical phase signal')
     contacts = np.zeros((count, 2), dtype=bool); sides = []; offsets = []
@@ -41,6 +44,12 @@ def infer_phases(raw, skeleton, source, *, harmonics=3, low_fraction=.1,
             extrema[kind] = ranked[0][1]
         trough = extrema['minimum']
         low = smooth <= smooth[trough] + low_fraction * amplitude
+        if contact_mode=='toe':
+            # A forefoot may stay low through a fast toe-off. Restrict its
+            # repair window by travel-corrected speed, without a ground plane.
+            low &= np.linalg.norm(velocity[:-1,side,1,:2],axis=-1)<=25.
+            if not low[trough]:
+                raise ValueError('Forefoot trough has no slow support candidate: '+label)
         first = last = trough
         while low[(first-1) % period] and trough-first < period-1:
             first -= 1
@@ -56,7 +65,7 @@ def infer_phases(raw, skeleton, source, *, harmonics=3, low_fraction=.1,
             windowSeconds=(last-first)*length/period, smoothedHeightCm=smooth.tolist(),
             measuredHeightCm=signal.tolist()))
     gap = abs(sides[0]['troughFrame']-sides[1]['troughFrame'])/period
-    if abs(gap-.5) > .15:
+    if not .35 <= gap <= .65:
         raise ValueError('Vertical extrema do not alternate: ' + str(gap))
     # Use the overlap of the two measured low bands relative to each trough.
     # Different plateau widths must not shift one foot's inferred landing by
@@ -74,7 +83,7 @@ def infer_phases(raw, skeleton, source, *, harmonics=3, low_fraction=.1,
     return dict(policy=POLICY, passed=True, purpose='phase candidates for IK, not grounded-contact acceptance',
         source=source, sampledKeyCount=count, playLengthSeconds=length,
         independentOfGroundHeight=True, independentOfAuthoredContactCurves=True,
-        smoothingHarmonics=harmonics, lowBandFraction=low_fraction,
+        smoothingHarmonics=harmonics, lowBandFraction=low_fraction,contactMode=contact_mode,
         minimumExcursionCm=minimum_excursion_cm, minimumWindowSeconds=minimum_window_seconds,
         troughPhaseGap=gap, windowPolicy='common-trough-relative-measured-low-band',
         sides=sides, candidateContacts=contacts.astype(int).tolist())

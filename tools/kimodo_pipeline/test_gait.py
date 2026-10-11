@@ -8,7 +8,8 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from .gait import (GaitValidationError, audit_candidate, author_cycle,
-                   compile_foot_planted, detect_foot_contacts, detect_gait_events)
+                   compile_foot_planted, detect_foot_contacts, detect_gait_events,
+                   revalidate_authored_cycle, _array_hash)
 from .motion import complete
 
 
@@ -57,6 +58,23 @@ def walking_fixture(period=1., seconds=4., fps=60, speed=.6):
 
 
 class ContactDetectionTests(unittest.TestCase):
+    def test_cyclic_statistics_use_each_frame_once_and_ignore_start_phase(self):
+        period = 24
+        t = np.arange(period) / 30.
+        points = np.zeros((period, 2, 2, 3))
+        points[..., 1] = (.04 + .025 * np.sin(2 * np.pi * t / (period / 30.)))[:, None, None]
+        points[..., 2] = (.1 * np.sin(2 * np.pi * t / (period / 30.)))[:, None, None]
+        velocity = (np.roll(points, -1, axis=0) - np.roll(points, 1, axis=0)) * 15.
+        near = points[:, 0, :, 1] <= .055
+        expected = np.median(np.linalg.norm(velocity[:, 0][:, :, [0, 2]], axis=-1)[near])
+        for shift in (0, 5, 12, 23):
+            rotated = np.roll(points, shift, axis=0)
+            detected = detect_foot_contacts(np.concatenate([rotated, rotated[:1]]), 30.,
+                                            cycle_displacement=np.zeros(3))
+            self.assertEqual(period, detected['measurementFrameCount'])
+            self.assertEqual(int(near.sum()), detected['measurements']['left']['nearGroundSamples'])
+            self.assertAlmostEqual(expected, detected['measurements']['left']['nearGroundMedianSpeedMps'])
+
     def test_skating_does_not_disappear_when_contact_detector_rejects_it(self):
         points = np.zeros((90, 2, 2, 3))
         points[..., 2] = (np.arange(90) / 30)[:, None, None]
@@ -107,6 +125,17 @@ class FootPlantedProtocolTests(unittest.TestCase):
 
 
 class EventCycleTests(unittest.TestCase):
+    def test_bound_pass_receipt_is_revalidated_against_actual_motion(self):
+        motion, rig = walking_fixture(seconds=5.)
+        master, receipt = author_cycle(motion, rig, expected_speed_mps=.6)
+        self.assertTrue(revalidate_authored_cycle(master, rig, receipt)['pass'])
+        master['root_positions'][:, 0] += .1 * np.sin(np.linspace(0, 2 * np.pi, len(master['root_positions'])))
+        receipt['outputMotionSha256'] = _array_hash(master['local_rot_mats'], master['root_positions'], master['fps'])
+        with self.assertRaises(GaitValidationError) as rejected:
+            revalidate_authored_cycle(master, rig, receipt)
+        self.assertTrue(any(c['name'].endswith('_geometric_slip') and not c['pass']
+                            for c in rejected.exception.receipt['checks']))
+
     def test_analytic_world_locked_walk_passes_and_preserves_unmodified_seam(self):
         motion, rig = walking_fixture()
         before = copy.deepcopy(motion)

@@ -25,6 +25,81 @@ class NativeSoleCalibrationTests(unittest.TestCase):
 
 
 class PeriodicRepairTests(unittest.TestCase):
+    def test_stance_residual_lock_preserves_foot_rotation_and_bone_lengths_with_original_caps(self):
+        source, rig = walking_fixture(seconds=5.)
+        source['root_positions'][:, 0] += .01 * np.sin(np.arange(len(source['root_positions'])) / 60 * 2 * np.pi)
+        original = copy.deepcopy(source)
+        fixed, report = repair_periodic(source, rig, .6, harmonics=4, stance_residual_lock=True)
+        self.assertTrue(report['after']['pass'])
+        self.assertLessEqual(report['maximumPeriodicFitRotationDegrees'], 20.)
+        self.assertLessEqual(report['maximumAnkleCorrectionMeters'], .15)
+        self.assertLessEqual(report['maximumHipLoweringMeters'], .05)
+        before, baseline = repair_periodic(source, rig, .6, harmonics=4)
+        rotations_before, _ = fk(before['local_rot_mats'], before['root_positions'], rig)
+        rotations_after, positions = fk(fixed['local_rot_mats'], fixed['root_positions'], rig)
+        for bone in ('LeftFoot', 'RightFoot'):
+            index = rig['jointNames'].index(bone)
+            np.testing.assert_allclose(rotations_after[:, index], rotations_before[:, index], atol=1e-10)
+        for joint, parent in enumerate(rig['parents']):
+            if parent >= 0:
+                np.testing.assert_allclose(np.linalg.norm(positions[:, joint] - positions[:, parent], axis=-1),
+                                           np.linalg.norm(rig['offsets'][joint]), atol=1e-10)
+        np.testing.assert_array_equal(source['local_rot_mats'], original['local_rot_mats'])
+        np.testing.assert_array_equal(source['root_positions'], original['root_positions'])
+        extra = report['stanceResidualLock']['maximumAdditionalRotationDegrees']
+        self.assertGreater(extra, 0.)
+        with self.assertRaisesRegex(ValueError, 'Combined periodic and stance'):
+            repair_periodic(source, rig, .6, harmonics=4, stance_residual_lock=True,
+                            max_pose_fit_degrees=baseline['maximumPeriodicFitRotationDegrees'] + extra / 2)
+        with self.assertRaisesRegex(ValueError, 'padding exceeds'):
+            repair_periodic(source, rig, .6, harmonics=4, stance_residual_lock=True, stance_residual_padding_frames=20)
+
+    def test_both_measured_support_seams_remain_valid_after_mirroring(self):
+        from .gait import author_cycle,mirror_authored_cycle
+        from .motion import freeze
+        source,rig=walking_fixture(seconds=5.)
+        fixed,report=repair_periodic(source,rig,.6,harmonics=4,seam_smoothing_frames=1,both_support_seams=True)
+        self.assertTrue(report['after']['pass'])
+        self.assertEqual('left',report['seamSmoothing']['side'])
+        self.assertEqual('right',report['seamSmoothing']['rightSeam']['side'])
+        master,accepted=author_cycle(fixed,rig,expected_speed_mps=.6)
+        _,mirrored=mirror_authored_cycle(master,freeze(source,0,1,rig),rig,accepted)
+        self.assertTrue(mirrored['pass'])
+
+    def test_seam_cleanup_preserves_stance_and_original_combined_budgets(self):
+        source,rig=walking_fixture(seconds=5.)
+        original=source['local_rot_mats'].copy()
+        fixed,report=repair_periodic(source,rig,.6,harmonics=4,seam_smoothing_frames=1)
+        self.assertTrue(report['after']['pass'])
+        self.assertTrue(audit_candidate(fixed,rig,.6)['pass'])
+        self.assertLessEqual(report['maximumPeriodicFitRotationDegrees'],20.)
+        self.assertLessEqual(report['maximumAnkleCorrectionMeters'],.15)
+        self.assertLessEqual(report['maximumHipLoweringMeters'],.05)
+        _,points=fk(fixed['local_rot_mats'],fixed['root_positions'],rig)
+        for joint,parent in enumerate(rig['parents']):
+            if parent>=0:np.testing.assert_allclose(np.linalg.norm(points[:,joint]-points[:,parent],axis=-1),
+                np.linalg.norm(rig['offsets'][joint]),atol=1e-10)
+        np.testing.assert_array_equal(source['local_rot_mats'],original)
+        _,baseline=repair_periodic(source,rig,.6,harmonics=4)
+        combined_limit=baseline['maximumPeriodicFitRotationDegrees']+report['seamSmoothing']['maximumAdditionalRotationDegrees']/2
+        with self.assertRaisesRegex(ValueError,'Combined periodic and seam'):
+            repair_periodic(source,rig,.6,harmonics=4,seam_smoothing_frames=1,max_pose_fit_degrees=combined_limit)
+        for radius in (True,-1,9):
+            with self.assertRaises(ValueError):repair_periodic(source,rig,.6,harmonics=4,seam_smoothing_frames=radius)
+
+    def test_bounded_contact_padding_is_a_repair_plan_not_acceptance(self):
+        source,rig=walking_fixture(seconds=5.)
+        original=source['local_rot_mats'].copy()
+        fixed,report=repair_periodic(source,rig,.6,harmonics=4,contact_padding_frames=1)
+        observed=np.asarray(report['measuredContactIntent'],bool)
+        planned=np.asarray(report['repairContactIntent'],bool)
+        np.testing.assert_array_equal(planned,observed|np.roll(observed,1,axis=0)|np.roll(observed,-1,axis=0))
+        self.assertTrue(report['after']['pass'])
+        self.assertTrue(audit_candidate(fixed,rig,.6)['pass'])
+        np.testing.assert_array_equal(source['local_rot_mats'],original)
+        with self.assertRaisesRegex(ValueError,'padding exceeds'):
+            repair_periodic(source,rig,.6,harmonics=4,contact_padding_frames=20)
+
     def test_planned_reference_support_does_not_replace_measured_output_gate(self):
         reference,rig=walking_fixture(seconds=5.)
         source=copy.deepcopy(reference)

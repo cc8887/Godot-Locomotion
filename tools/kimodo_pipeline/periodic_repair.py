@@ -42,7 +42,15 @@ def repair_periodic(source, rig, speed, *, harmonics=5, ramp_frames=3,
                     target_period_frames=None, constrained_cycle_span=None, contact_reference=None,
                     enforce_sole_clearance=False, minimum_knee_bend_degrees=0.,
                     upper_body_harmonics=None, contact_phase_shift_frames=0, fit_regularization=.002,
-                    upper_body_motion_scale=1.,stabilize_knee_poles=False,flat_stance=False):
+                    upper_body_motion_scale=1.,stabilize_knee_poles=False,flat_stance=False,
+                    contact_padding_frames=0,seam_smoothing_frames=0,both_support_seams=False,
+                    stance_residual_lock=False,stance_residual_padding_frames=0):
+    if not isinstance(stance_residual_lock, bool):
+        raise ValueError('Stance residual lock must be a boolean')
+    if not isinstance(both_support_seams,bool):raise ValueError('Both support seams must be a boolean')
+    if (not isinstance(seam_smoothing_frames,int) or isinstance(seam_smoothing_frames,bool)
+            or seam_smoothing_frames<0):
+        raise ValueError('Seam smoothing radius must be a nonnegative integer')
     if not math.isfinite(fit_regularization) or fit_regularization<0:
         raise ValueError('Periodic fit regularization must be finite and nonnegative')
     audit = gait.audit_candidate(source, rig, speed)
@@ -147,6 +155,12 @@ def repair_periodic(source, rig, speed, *, harmonics=5, ramp_frames=3,
                 if b-a < 3:
                     expanded[a:b] = False
             intent[:, side, sample] = expanded[period:2*period]
+    if (not isinstance(contact_padding_frames,int) or isinstance(contact_padding_frames,bool)
+            or not 0<=contact_padding_frames<=period//8):
+        raise ValueError('Contact padding exceeds one eighth of the gait cycle')
+    measured_intent=intent.copy()
+    for shift in range(1,contact_padding_frames+1):
+        intent |= np.roll(measured_intent,shift,axis=0)|np.roll(measured_intent,-shift,axis=0)
     if not isinstance(contact_phase_shift_frames,int) or abs(contact_phase_shift_frames)>period//8:
         raise ValueError('Support phase adjustment exceeds one eighth of the gait cycle')
     intent=np.roll(intent,contact_phase_shift_frames,axis=0)
@@ -279,22 +293,185 @@ def repair_periodic(source, rig, speed, *, harmonics=5, ramp_frames=3,
     output_roots[:, [0, 2]] -= output_roots[0, [0, 2]]
     repaired = motion.complete(repaired_local[first:last], output_roots, rig, fps)
     after = gait.audit_candidate(repaired, rig, speed)
+    seam_report = None
+    maximum_ankle_correction=float(correction.max())
+    maximum_hip_lowering=float(lowered.max())
+    if seam_smoothing_frames:
+        repaired,seam_report=smooth_repaired_seam(repaired,rig,speed,period,seam_smoothing_frames,after)
+        if both_support_seams:
+            before_both=motion.complete(repaired_local[first:last],output_roots,rig,fps)
+            repaired,right_report=smooth_repaired_seam(repaired,rig,speed,period,seam_smoothing_frames,
+                gait.audit_candidate(repaired,rig,speed),side='right')
+            seam_report['rightSeam']=right_report
+            _,before_points=motion.fk(before_both['local_rot_mats'],before_both['root_positions'],rig)
+            _,after_points=motion.fk(repaired['local_rot_mats'],repaired['root_positions'],rig)
+            feet=[names['LeftFoot'],names['RightFoot']]
+            angle=np.rad2deg(np.linalg.norm(Rotation.from_matrix((repaired['local_rot_mats']@
+                before_both['local_rot_mats'].swapaxes(-1,-2)).reshape(-1,3,3)).as_rotvec(),axis=-1))
+            seam_report.update(maximumAdditionalRotationDegrees=float(angle.max()),
+                maximumAdditionalFootMeters=float(np.linalg.norm(after_points[:,feet]-before_points[:,feet],axis=-1).max()),
+                maximumAdditionalRootMeters=float(np.linalg.norm(repaired['root_positions']-before_both['root_positions'],axis=-1).max()))
+        maximum_ankle_correction+=seam_report['maximumAdditionalFootMeters']
+        maximum_hip_lowering+=seam_report['maximumAdditionalRootMeters']
+        maximum_fit_degrees+=seam_report['maximumAdditionalRotationDegrees']
+        if (maximum_ankle_correction>max_ankle_correction or maximum_hip_lowering>max_hip_lowering
+                or maximum_fit_degrees>max_pose_fit_degrees):
+            raise ValueError('Combined periodic and seam correction exceeds the original correction bounds')
+        after=gait.audit_candidate(repaired,rig,speed)
+    stance_report = None
+    if stance_residual_lock:
+        repaired, stance_report = lock_stance_residual(repaired, rig, period, stance_residual_padding_frames)
+        maximum_ankle_correction += stance_report['maximumAdditionalFootMeters']
+        maximum_fit_degrees += stance_report['maximumAdditionalRotationDegrees']
+        maximum_hip_lowering += stance_report['maximumAdditionalRootMeters']
+        if (maximum_ankle_correction > max_ankle_correction or maximum_fit_degrees > max_pose_fit_degrees
+                or maximum_hip_lowering > max_hip_lowering):
+            raise ValueError(f'Combined periodic and stance correction exceeds the original correction bounds: '
+                             f'rotation={maximum_fit_degrees:.4f}, foot={maximum_ankle_correction:.6f}, hip={maximum_hip_lowering:.6f}')
+        after = gait.audit_candidate(repaired, rig, speed)
     report = dict(schemaVersion=1, algorithm='periodic_fourier_with_world_contact_ik_v1',
         productionReady=False, sourceCycle=chosen, constructedCycles=cycles,
         sourceWasAcceptedMaster=audit['pass'], sourceAudit=audit, after=after,
         harmonics=harmonics, rampFrames=ramp_frames,
         upperBodyHarmonics=upper_body_harmonics,minimumKneeBendDegrees=minimum_knee_bend_degrees,
         contactPhaseShiftFrames=contact_phase_shift_frames,
+        contactPaddingFrames=contact_padding_frames,
+        measuredContactIntent=measured_intent.astype(int).tolist(),
+        repairContactIntent=intent.astype(int).tolist(),
         fitRegularization=fit_regularization,
         upperBodyMotionScale=upper_body_motion_scale,stabilizedKneePoles=bool(stabilize_knee_poles),
         flatStanceApplied=bool(flat_stance),
         soleClearanceApplied=bool(enforce_sole_clearance),
         sourcePeriodFrames=source_period, outputPeriodFrames=period,
-        maximumAnkleCorrectionMeters=float(correction.max()), maximumHipLoweringMeters=float(lowered.max()),
+        maximumAnkleCorrectionMeters=maximum_ankle_correction, maximumHipLoweringMeters=maximum_hip_lowering,
         maximumPeriodicFitRotationDegrees=maximum_fit_degrees,
         contactPlan=plans, contactPlanSource=('measured source heel/toe contact intervals' if contact_cycle is None
             else 'independently measured generation-reference heel/toe intervals'),
         contactReferenceMotionSha256=None if contact_cycle is None else contact_audit['sourceMotionSha256'],
         contactReferenceCycle=contact_cycle,
         outputSpace='travelling', repairAcceptedByAuthoringGate=after['pass'])
+    if seam_report is not None:report['seamSmoothing']=seam_report
+    if stance_report is not None:report['stanceResidualLock']=stance_report
     return repaired, report
+
+
+def lock_stance_residual(source, rig, period, padding=0):
+    """Pin horizontal sole midpoints during independently observed support.
+
+    Keep vertical swing, world foot rotations and toes unchanged. Work in an
+    interior repetition so anchors and blend ramps cannot depend on the crop.
+    """
+    if (not isinstance(padding, int) or isinstance(padding, bool) or not 0 <= padding <= period // 8):
+        raise ValueError('Stance residual padding exceeds one eighth of the gait cycle')
+    if len(source['root_positions']) < period + 1:
+        raise ValueError('Stance residual lock requires a complete cycle')
+    phases = np.arange(3 * period + 1)
+    displacement = source['root_positions'][period] - source['root_positions'][0]
+    repeated = motion.complete(source['local_rot_mats'][phases % period],
+        source['root_positions'][phases % period] + (phases // period)[:, None] * displacement, rig, source['fps'])
+    rotations, joints = motion.fk(repeated['local_rot_mats'], repeated['root_positions'], rig)
+    landmarks, _ = gait.foot_landmarks(repeated, rig)
+    observed = gait.detect_gait_events(repeated, rig)
+    measured = np.asarray(observed['contacts'], bool)[period:2 * period]
+    plan = measured.copy()
+    for shift in range(1, padding + 1):
+        plan |= np.roll(measured, shift, axis=0) | np.roll(measured, -shift, axis=0)
+    targets = np.stack([joints[:, rig['jointNames'].index(s + 'Foot')] for s in ('Left', 'Right')], axis=1)
+    for side in range(2):
+        for start, stop in _runs(np.tile(plan[:, side], 3)):
+            center = landmarks[start:stop, side].mean(axis=1)
+            anchor = np.median(center[:, [0, 2]], axis=0)
+            begin, finish = max(0, start - 2), min(len(targets), stop + 2)
+            for frame in range(begin, finish):
+                weight = min(_ease((frame - begin) / max(1, start - begin)),
+                             _ease((finish - 1 - frame) / max(1, finish - stop)))
+                if start <= frame < stop:
+                    weight = 1.
+                midpoint = landmarks[frame, side].mean(axis=0)
+                targets[frame, side, [0, 2]] += weight * (anchor - midpoint[[0, 2]])
+    local = repeated['local_rot_mats'].copy()
+    names = {n: i for i, n in enumerate(rig['jointNames'])}
+    roots = repeated['root_positions'].copy()
+    required = np.zeros(period)
+    for side, prefix in enumerate(('Left', 'Right')):
+        hip = joints[period:2 * period, names[prefix + 'Leg']]
+        reach = (np.linalg.norm(rig['offsets'][names[prefix + 'Shin']]) +
+                 np.linalg.norm(rig['offsets'][names[prefix + 'Foot']]) - 1e-6)
+        goal = targets[period:2 * period, side]
+        horizontal2 = np.sum((hip[:, [0, 2]] - goal[:, [0, 2]]) ** 2, axis=-1)
+        if np.any(horizontal2 >= reach ** 2):
+            raise ValueError('Stance residual target exceeds horizontal leg reach')
+        required = np.maximum(required, hip[:, 1] - goal[:, 1] - np.sqrt(reach ** 2 - horizontal2))
+    lowering = gaussian_filter1d(maximum_filter1d(required, size=3, mode='wrap'), 1., mode='wrap')
+    lowering += max(0., float(np.max(required - lowering)))
+    roots[:, 1] -= lowering[phases % period]
+    for frame in range(period, 2 * period):
+        for side, label in enumerate(('left', 'right')):
+            foot = names[label.title() + 'Foot']
+            toes = {}
+            for joint in range(len(names)):
+                ancestor = rig['parents'][joint]
+                while ancestor >= 0 and ancestor != foot:
+                    ancestor = rig['parents'][ancestor]
+                if ancestor == foot:
+                    toes[joint] = repeated['local_rot_mats'][frame, joint]
+            local[frame] = solve_foot_ik(local[frame], roots[frame], rig,
+                                       label, targets[frame, side], rotations[frame, foot], toes)
+    output_phases = np.arange(len(source['root_positions'])) % period
+    output_roots = source['root_positions'].copy()
+    output_roots[:, 1] -= lowering[output_phases]
+    result = motion.complete(local[period:2 * period][output_phases], output_roots, rig, source['fps'])
+    _, before = motion.fk(source['local_rot_mats'], source['root_positions'], rig)
+    _, after = motion.fk(result['local_rot_mats'], result['root_positions'], rig)
+    feet = [names['LeftFoot'], names['RightFoot']]
+    angles = np.rad2deg(np.linalg.norm(Rotation.from_matrix((result['local_rot_mats'] @
+               source['local_rot_mats'].swapaxes(-1, -2)).reshape(-1, 3, 3)).as_rotvec(), axis=-1))
+    return result, dict(algorithm='observed_stance_horizontal_midpoint_lock_v1',
+        contactPaddingFrames=padding, measuredSupport=measured.astype(int).tolist(),
+        plannedSupport=plan.astype(int).tolist(), maximumAdditionalRotationDegrees=float(angles.max()),
+        maximumAdditionalFootMeters=float(np.linalg.norm(after[:, feet] - before[:, feet], axis=-1).max()),
+        maximumAdditionalRootMeters=float(lowering.max()), requires=['independent_unique_period_authoring_gate', 'target_gate', 'runtime_gate'])
+
+
+def smooth_repaired_seam(source,rig,speed,period,radius,audit,*,side='left'):
+    from .als_reference import smooth_constraint_seam
+    smoothed,receipt=smooth_constraint_seam(source,rig,speed,period,radius,side=side)
+    contacts=np.asarray(audit['detection']['contacts'],bool)
+    global_before,points=motion.fk(source['local_rot_mats'],source['root_positions'],rig)
+    local=smoothed['local_rot_mats'].copy()
+    names={name:i for i,name in enumerate(rig['jointNames'])}
+    center=receipt['centerPhaseFrame']
+    left,right=(center-radius)%period,(center+radius)%period
+    phases=set((center+np.arange(-radius+1,radius))%period)
+    displacement=source['root_positions'][period]-source['root_positions'][0]
+    travel=np.arange(len(local))[:,None]/period*displacement
+    relative_points=points-travel[:,None]
+    for frame in range(len(local)):
+        for index,foot_side in enumerate(('left','right')):
+            foot=names[foot_side.title()+'Foot']
+            toes={}
+            for joint,parent in enumerate(rig['parents']):
+                ancestor=parent
+                while ancestor>=0 and ancestor!=foot:ancestor=rig['parents'][ancestor]
+                if ancestor==foot:toes[joint]=source['local_rot_mats'][frame,joint]
+            if contacts[frame,index]:
+                target,orientation=points[frame,foot],global_before[frame,foot]
+            elif frame%period in phases:
+                weight=((frame%period-center+radius)%period)/(2*radius)
+                target=relative_points[left,foot]*(1-weight)+relative_points[right,foot]*weight+travel[frame]
+                orientation=Slerp([0,1],Rotation.from_matrix(global_before[[left,right],foot]))([weight]).as_matrix()[0]
+                toes={joint:smoothed['local_rot_mats'][frame,joint] for joint in toes}
+            else:continue
+            local[frame]=solve_foot_ik(local[frame],smoothed['root_positions'][frame],rig,foot_side,target,orientation,toes)
+    result=motion.complete(local,smoothed['root_positions'],rig,source['fps'])
+    _,changed_points=motion.fk(local,result['root_positions'],rig)
+    feet=[names['LeftFoot'],names['RightFoot']]
+    angle=np.rad2deg(np.linalg.norm(Rotation.from_matrix(
+        (local@source['local_rot_mats'].swapaxes(-1,-2)).reshape(-1,3,3)).as_rotvec(),axis=-1))
+    return result,dict(scope='bounded_authoring_cleanup',algorithm='geodesic_seam_stance_preserving_ik_v1',
+        radiusFrames=radius,centerPhaseFrame=center,side=side,preSeamAudit=audit,
+        maximumAdditionalRotationDegrees=float(angle.max()),
+        maximumAdditionalFootMeters=float(np.linalg.norm(changed_points[:,feet]-points[:,feet],axis=-1).max()),
+        maximumAdditionalRootMeters=float(np.linalg.norm(result['root_positions']-source['root_positions'],axis=-1).max()),
+        correctionBudget='sum of original and seam maxima; original limits remain unchanged',
+        requires=['actual_generated_authoring_gate','target_gait_gate','runtime_gate'])

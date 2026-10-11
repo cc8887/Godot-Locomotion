@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--base-pack',type=Path,help='Retain deliveries from this diagnostic pack and generate its missing derived resources')
     parser.add_argument('--runtime-case',action='append',help='Exact related runtime scenario; omitted runs the full matrix')
     parser.add_argument('--target',action='append',help='Exact node id; includes all transitive prerequisites')
-    parser.add_argument('--scope',choices=('all','non-prop','mantle','air','derived'),default='non-prop',help='Non-prop closure, independent mantle/air/derived lane, or explicit diagnostic nodes')
+    parser.add_argument('--scope',choices=('all','non-prop','mantle','air','derived','run'),default='non-prop',help='Non-prop closure, independent mantle/air/derived/run lane, or explicit diagnostic nodes')
     parser.add_argument('--keep-going',action='store_true',help='Attempt independent branches; failed prerequisites still block dependents')
     parser.add_argument('--authoring-only',action='store_true',help='Explicit diagnostic exception: stop before conversion/runtime')
     parser.add_argument('--pack-output',type=Path)
@@ -34,7 +34,7 @@ def main():
     parser.add_argument('--offline-deps',type=Path,default=ROOT/'artifacts/kimodo_als/offline-python-deps')
     args=parser.parse_args()
     if args.rules is None:
-        args.rules=ROOT/'tools/kimodo_pipeline'/('air_rules.json' if args.scope=='air' else 'directional_gait_rules.json')
+        args.rules=ROOT/'tools/kimodo_pipeline'/({'air':'air_rules.json','run':'run_rules.json'}.get(args.scope,'directional_gait_rules.json'))
     if args.scope=='air':
         from tools.kimodo_pipeline.air import build_graph as build_air_graph
         graph=build_air_graph(read_json(args.contracts),load_rules(args.rules))
@@ -42,13 +42,20 @@ def main():
     if args.upstream_receipts or args.scope=='derived':
         from tools.kimodo_pipeline.derived import reuse_upstream
         graph=reuse_upstream(graph,args.upstream_receipts,derived_only=args.scope=='derived')
-    if args.scope in ('non-prop','mantle'):
+    if args.scope in ('non-prop','mantle','run'):
         from tools.kimodo_pipeline.scope import non_prop_targets
         if args.target:raise ValueError('Use either a named scope or explicit --target')
         args.target=non_prop_targets(read_json(args.contracts))
         if args.scope=='mantle':
             args.target=[key for key in args.target if graph['nodes'][key]['params']['contract']['family']=='mantle']
             if not args.target:raise ValueError('No mantle assets in the selected non-prop contract')
+        elif args.scope=='run':
+            from tools.kimodo_pipeline.scope import run_targets
+            args.target=run_targets(read_json(args.contracts))
+            if any(graph['nodes'][key]['params']['contract'].get('targetGaitPolicy')!='als-forward-v1'
+                   for key in args.target):
+                raise ValueError('Run scope requires authoring and target gait gates for every direction')
+            graph['pipeline']='run'
     elif args.scope=='air':
         from tools.kimodo_pipeline.air import targets
         if args.target:raise ValueError('Use either the Air scope or explicit --target')
@@ -75,7 +82,7 @@ def main():
         path.write_text(json.dumps(requests,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
         print(json.dumps({'inputs':len(requests),'path':str(path)},ensure_ascii=False));return
     if not args.authoring_only:
-        if args.scope not in ('non-prop','mantle','air','derived'):parser.error('Full pipeline requires a named production scope; explicit graph diagnostics use --authoring-only')
+        if args.scope not in ('non-prop','mantle','air','derived','run'):parser.error('Full pipeline requires a named production scope; explicit graph diagnostics use --authoring-only')
         if not args.kimodo_repo:parser.error('Full pipeline requires --kimodo-repo')
         for path in (args.godot,args.dotnet,args.offline_deps/'ufbx/__init__.py'):
             if not path.is_file():parser.error('Full-pipeline dependency missing: '+str(path))

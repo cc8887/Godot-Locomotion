@@ -9,7 +9,7 @@ from scipy.spatial.transform import Rotation
 from .graph import build_graph, load_rules, read_json, topological_order
 from .gait import author_cycle, mirror_authored_cycle, detect_gait_events
 from .gait_constraints import materialize_gait_constraints
-from .motion import freeze, materialize_constraints,save_motion,load_motion
+from .motion import complete, freeze, materialize_constraints,save_motion,load_motion
 from .test_gait import walking_fixture
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -120,7 +120,15 @@ class MirroredGaitTests(unittest.TestCase):
         self.assertTrue(checked['pass'])
         self.assertIn('mirrorProvenance', checked)
         self.assertEqual(61, checked['outputFrameCount'])
-        self.assertEqual('left', checked['events'][0]['side'])
+        self.assertEqual('right', checked['events'][0]['side'])
+        self.assertEqual('right', checked['cycleAnchorSide'])
+        # This symmetric fixture permits exact comparison at unchanged time
+        # indices. Re-cropping at the opposite landing would violate it.
+        from .motion import mirror
+        neutral = complete(np.broadcast_to(np.eye(3), (1, len(rig['jointNames']), 3, 3)).copy(),
+                           np.zeros((1, 3)), rig, 60.)
+        expected = mirror(master, neutral, rig)
+        np.testing.assert_allclose(reflected['local_rot_mats'], expected['local_rot_mats'], atol=1e-10)
         self.assertAlmostEqual(.6, checked['actualAuthoredSpeedMps'], places=8)
         self.assertLess(np.max(np.abs(reflected['root_positions'][:, [0, 2]])), .01)
 

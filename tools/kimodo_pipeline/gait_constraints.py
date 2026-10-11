@@ -146,6 +146,9 @@ def materialize_gait_constraints(params, reference_motion, rig):
     heading = math.radians(float(path.get('headingDegrees', 0.)))
     if not math.isfinite(heading):
         raise ValueError('Invalid root path heading')
+    preserve_heading = params.get('preserveReferenceHeading', False)
+    if not isinstance(preserve_heading, bool):
+        raise ValueError('preserveReferenceHeading must be a boolean')
     audit = audit_candidate(reference_motion, rig, policy=params.get('gaitPolicy'))
     receipt = {'schemaVersion': 1, 'scope': 'generation_constraint_consistency_only',
                'referenceAcceptedAsMaster': False, 'referenceAuditPass': audit['pass'],
@@ -172,6 +175,16 @@ def materialize_gait_constraints(params, reference_motion, rig):
     hips = rig.get('hipJointNames', ['RightLeg', 'LeftLeg'])
     right_hip, left_hip = (names[name] for name in hips)
     world_path = np.arange(count)[:, None] / fps * velocity * direction
+    desired_headings = np.full(count, heading)
+    if preserve_heading:
+        # Pelvis yaw is part of the planted-leg geometry, independently of the
+        # travel direction. Give root2d the same phase-varying yaw as the poses.
+        sample_times = start + (np.arange(count) % period_frames) / period_frames * (end - start)
+        sampled_local = np.stack([interpolator(sample_times).as_matrix()
+                                  for interpolator in interpolators], axis=1)
+        _, sampled_points = fk(sampled_local, np.zeros((count, 3)), rig)
+        line = sampled_points[:, right_hip] - sampled_points[:, left_hip]
+        desired_headings = np.arctan2(line[:, 2], -line[:, 0])
 
     def required_lowering(local, root, side, anchor):
         _, joints = fk(local[None], root[None], rig)
@@ -197,7 +210,8 @@ def materialize_gait_constraints(params, reference_motion, rig):
         reference_globals, reference_points = fk(normalized, root_source, rig)
         hip_line = reference_points[:, right_hip] - reference_points[:, left_hip]
         angles = np.arctan2(hip_line[:, 2], -hip_line[:, 0])
-        normalized[:, 0] = Rotation.from_euler('y', (heading-angles)[:, None]).as_matrix() @ normalized[:, 0]
+        if not preserve_heading:
+            normalized[:, 0] = Rotation.from_euler('y', (heading-angles)[:, None]).as_matrix() @ normalized[:, 0]
         _, reference_points = fk(normalized, root_source, rig)
         for side in ('left', 'right'):
             foot = names[side.title()+'Foot']
@@ -214,7 +228,8 @@ def materialize_gait_constraints(params, reference_motion, rig):
         _, points = fk(local[None], root[None], rig)
         hip_line = points[0, right_hip] - points[0, left_hip]
         measured_heading = math.atan2(hip_line[2], -hip_line[0])
-        local[0] = Rotation.from_euler('y', heading - measured_heading).as_matrix() @ local[0]
+        if not preserve_heading:
+            local[0] = Rotation.from_euler('y', heading - measured_heading).as_matrix() @ local[0]
         if stride_means:
             global_rot, points = fk(local[None], root[None], rig)
             targets = {}
@@ -276,8 +291,22 @@ def materialize_gait_constraints(params, reference_motion, rig):
     # the phase-zero pose and create a shortened final stride.
     if params.get('constrainClipEndpoint', False):
         boundaries = sorted(set(boundaries) | {count - 1})
+    foot_boundary_radius = params.get('footBoundaryContextFrames')
+    foot_boundaries = set()
+    if foot_boundary_radius is not None:
+        if (not isinstance(foot_boundary_radius, int) or isinstance(foot_boundary_radius, bool)
+                or not 0 <= foot_boundary_radius < period_frames // 2):
+            raise ValueError('Foot boundary context must be a nonnegative frame radius below half a period')
+        for boundary in cycle_boundaries:
+            foot_boundaries.update(range(max(0, boundary-foot_boundary_radius),
+                                         min(count, boundary+foot_boundary_radius+1)))
+        if params.get('constrainClipEndpoint', False):
+            foot_boundaries.add(count-1)
     poses = {frame: sample_pose(frame) for frame in boundaries}
-    side_frames, pairs, targets = {'left': set(), 'right': set()}, [], {}
+    for frame in foot_boundaries:
+        if frame not in poses:poses[frame] = sample_pose(frame)
+    side_frames = {side: foot_boundaries.copy() for side in ('left', 'right')}
+    pairs, targets = [], {}
     anchor_count = params.get('supportAnchorCount', 2)
     if not isinstance(anchor_count, int) or not 2 <= anchor_count <= maximum_frames:
         raise ValueError('A support interval requires at least two sparse anchors')
@@ -408,7 +437,8 @@ def materialize_gait_constraints(params, reference_motion, rig):
             pair['maximumRotationErrorRadians'] = max(pair['maximumRotationErrorRadians'], float(angle))
     constraints = [{'type': 'root2d', 'frame_indices': list(range(count)),
                     'smooth_root_2d': world_path.tolist(),
-                    'global_root_heading': [[math.cos(heading), math.sin(heading)]] * count}]
+                    'global_root_heading': np.column_stack((np.cos(desired_headings),
+                                                             np.sin(desired_headings))).tolist()}]
     maximum_path_error, maximum_heading_error = 0., 0.
     sparse=[('fullbody',boundaries)]+[(side+'-foot',sorted(side_frames[side])) for side in ('left','right')]
     if constrain_hands:sparse.extend((side+'-hand',boundaries) for side in ('left','right'))
@@ -420,7 +450,8 @@ def materialize_gait_constraints(params, reference_motion, rig):
         _, positions = fk(local, root, rig)
         line = positions[:, right_hip] - positions[:, left_hip]
         observed_heading = np.arctan2(line[:, 2], -line[:, 0])
-        angle_error = np.abs(np.arctan2(np.sin(observed_heading - heading), np.cos(observed_heading - heading)))
+        difference = observed_heading - desired_headings[frames]
+        angle_error = np.abs(np.arctan2(np.sin(difference), np.cos(difference)))
         maximum_heading_error = max(maximum_heading_error, float(angle_error.max()))
         maximum_path_error = max(maximum_path_error, float(np.max(np.abs(root[:, [0, 2]] - world_path[frames]))))
         constraints.append({'type': kind, 'frame_indices': frames, 'local_joints_rot': axis.tolist(),
@@ -432,7 +463,10 @@ def materialize_gait_constraints(params, reference_motion, rig):
     receipt.update(selectedReferenceCycle=cycle, targetPeriodFrames=period_frames,
                    referenceStrideScale=stride_scale,
                    strideMatchedToPeriod=bool(stride_means),
+                   preserveReferenceHeading=preserve_heading,
+                   rootHeadingRangeDegrees=np.rad2deg([desired_headings.min(), desired_headings.max()]).tolist(),
                    boundaryFrames=boundaries, cycleBoundaryFrames=cycle_boundaries,
+                   footBoundaryFrames=sorted(foot_boundaries),
                    supportPairs=pairs, constraintCounts=counts,
                    maximumPathErrorMeters=maximum_path_error,
                    maximumHeadingErrorRadians=maximum_heading_error,

@@ -6,3 +6,7 @@ def is_prop(row):
 
 def non_prop_targets(contracts):
     return [f"asset:{r['edition']}:{r['asset']}" for r in contracts['assets'] if not is_prop(r)]
+
+def run_targets(contracts):
+    return [f"asset:{r['edition']}:{r['asset']}" for r in contracts['assets']
+            if r['family']=='gait_cycle' and r['semanticName'].startswith('Run_') and not is_prop(r)]

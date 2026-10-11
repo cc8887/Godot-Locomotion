@@ -95,7 +95,7 @@ def reuse_upstream(graph, paths, *, derived_only=False):
 def handle_reuse(runner, node, folder):
     import shutil
     from .motion import load_motion
-    from .gait import _array_hash
+    from .gait import _array_hash, revalidate_authored_cycle
     p = node['params']
     if file_hash(p['receiptFile']) != p['receiptSha256']:
         raise ValueError('Upstream receipt changed')
@@ -116,9 +116,15 @@ def handle_reuse(runner, node, folder):
         target = p['originalNode']['params'].get('targetCount')
         if target is not None and len(motion['root_positions']) != target:
             raise ValueError('Upstream gait time domain differs')
+        current_validation = revalidate_authored_cycle(motion, runner.rig(), gate)
     for name in ('motion.npz', 'gait-validation.json', 'authoring-trajectory.json', 'upper-body-validation.json'):
         if name in outputs:
             shutil.copy2(outputs[name]['path'], folder / name)
+    if 'gait-validation.json' in outputs:
+        gate.update(policy=current_validation['policy'], policySha256=current_validation['policySha256'],
+                    cycleAnchorSide=current_validation['cycleAnchorSide'],
+                    reuseValidation=current_validation)
+        write_json(folder / 'gait-validation.json', gate)
     write_json(folder / 'reuse-provenance.json', p)
 
 

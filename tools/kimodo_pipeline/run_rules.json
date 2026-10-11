@@ -1,0 +1,72 @@
+{
+  "extends": "directional_gait_rules.json",
+  "seed": 20261012,
+  "locomotionOverrides": {
+    "Run_Forward": {
+      "prompt": "A person is running forward at a steady pace, repeating complete alternating strides with coordinated arm swings.",
+      "direction": [0, 1], "headingDegrees": 0
+    },
+    "Run_Backward": {
+      "prompt": "A person is running backward at a steady pace, repeating complete alternating strides with coordinated arm swings.",
+      "direction": [0, -1], "headingDegrees": 0
+    },
+    "Run_Left_Forward": {
+      "prompt": "A person is running to their left at a steady pace, taking complete alternating forward strides with hips turned left and shoulders facing forward.",
+      "direction": [1, 0], "headingDegrees": 45
+    },
+    "Run_Left_Backward": {
+      "prompt": "A person is running to their left at a steady pace, taking complete alternating backward strides with hips turned right and shoulders facing forward.",
+      "direction": [1, 0], "headingDegrees": -45
+    }
+  },
+  "gaitClosure": {
+    "Run_Forward": {
+      "candidateCycles": 3, "fullBodyPhaseCycles": 3, "boundaryContextFrames": 2,
+      "fullBodyPhaseFractions": [0.041666666666666664, 0.08333333333333333, 0.5, 0.9166666666666666, 0.9583333333333334],
+      "supportAnchorCount": 6, "supportWindowFraction": 0.75, "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3, "maximumAnchorCorrectionMeters": 0.15,
+      "constraintReference": "native_als", "constrainHandOrientations": true,
+      "repairAfterGeneration": true, "finalRepairHarmonics": 4,
+      "repairRampFrames": 2, "repairCycleIndex": 0, "repairSeamSmoothingFrames": 1, "contactPaddingFrames": 0,
+      "minimumKneeBendDegrees": 21, "fitRegularization": 0.02,
+      "repairStanceResidualLock": true,
+      "discoverySeconds": 4, "repairMirroredCycle": true
+    },
+    "Run_Backward": {
+      "candidateCycles": 3, "fullBodyPhaseCycles": 3, "boundaryContextFrames": 1,
+      "supportAnchorCount": 4, "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3, "maximumAnchorCorrectionMeters": 0.15,
+      "constraintReference": "native_als", "constrainHandOrientations": true,
+      "repairAfterGeneration": true, "finalRepairHarmonics": 2,
+      "repairRampFrames": 4, "repairCycleIndex": 1, "contactPaddingFrames": 1,
+      "minimumKneeBendDegrees": 15, "fitRegularization": 0.02,
+      "discoverySeconds": 4, "repairMirroredCycle": true
+    },
+    "Run_Left_Forward": {
+      "candidateCycles": 3, "fullBodyPhaseCycles": 3, "boundaryContextFrames": 2,
+      "fullBodyPhaseFractions": [0.041666666666666664, 0.08333333333333333, 0.5, 0.9166666666666666, 0.9583333333333334],
+      "supportAnchorCount": 6, "supportWindowFraction": 1, "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3, "maximumAnchorCorrectionMeters": 0.15,
+      "constraintReference": "native_als", "constrainHandOrientations": true,
+      "repairAfterGeneration": true, "finalRepairHarmonics": 3,
+      "repairRampFrames": 3, "repairCycleIndex": 2, "repairSeamSmoothingFrames": 1, "contactPaddingFrames": 0,
+      "stabilizeKneePoles": true,
+      "preserveReferenceHeading": true, "targetPhaseHarmonics": 3,
+      "minimumKneeBendDegrees": 15, "fitRegularization": 0.02,
+      "discoverySeconds": 4, "repairMirroredCycle": true
+    },
+    "Run_Left_Backward": {
+      "candidateCycles": 3, "fullBodyPhaseCycles": 3, "boundaryContextFrames": 2,
+      "fullBodyPhaseFractions": [0.05, 0.1, 0.5, 0.9, 0.95],
+      "supportAnchorCount": 6, "supportWindowFraction": 1, "supportPairSpacingSeconds": 0.22,
+      "maximumConstraintCycles": 3, "maximumAnchorCorrectionMeters": 0.15,
+      "constraintReference": "native_als", "constrainHandOrientations": true,
+      "repairAfterGeneration": true, "finalRepairHarmonics": 3,
+      "repairRampFrames": 3, "repairCycleIndex": 0, "repairSeamSmoothingFrames": 1, "contactPaddingFrames": 1,
+      "flatStance": true, "targetPhaseHarmonics": 2,
+      "preserveReferenceHeading": true, "repairStanceResidualLock": true,
+      "minimumKneeBendDegrees": 20, "fitRegularization": 0.02,
+      "discoverySeconds": 4, "repairMirroredCycle": true
+    }
+  }
+}

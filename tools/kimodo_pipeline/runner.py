@@ -9,7 +9,7 @@ import uuid
 from importlib.metadata import version
 from pathlib import Path
 
-from .graph import digest, read_json, topological_order
+from .graph import digest, read_json, topological_order, validate_cfg_weights
 
 
 def file_hash(path):
@@ -272,12 +272,28 @@ class Runner:
             from .als_reference import native_gait_reference
             index=Path(p['indexPath'])
             if not index.is_absolute():index=Path(__file__).resolve().parents[2]/index
-            motion,receipt=native_gait_reference(index,p['source'],rig,p['expectedSpeedMps'],p['direction'])
+            motion,receipt=native_gait_reference(index,p['source'],rig,p['expectedSpeedMps'],p['direction'],
+                seam_smoothing_frames=p.get('seamSmoothingFrames',0),
+                seam_smoothing_mask=p.get('seamSmoothingMask','all'))
             m.save_motion(folder/'motion.npz',motion,rig)
             write_json(folder/'constraint-reference.json',receipt)
             return
+        if op=='mirrored_gait_reference':
+            from .gait import reflected_gait_reference,audit_candidate
+            parent=self.output_of(p['source']).get('gait-validation.json')
+            if not parent:raise ValueError('Mirrored gait conditions require an accepted parent receipt')
+            gate=read_json(parent['path'])
+            motion,period=reflected_gait_reference(self.motion(p['source']),self.motion(p['base']),rig,gate)
+            m.save_motion(folder/'motion.npz',motion,rig)
+            write_json(folder/'constraint-reference.json',dict(scope='constraint_reference_only',deliverable=False,
+                productionReady=False,periodFrames=period,parentSource=p['source'],parentReceipt=parent,
+                parentOutputMotionSha256=gate['outputMotionSha256'],
+                referenceAudit=audit_candidate(motion,rig,gate['actualAuthoredSpeedMps']),
+                requires=['actual_generated_authoring_gate','target_gait_gate','runtime_gate']))
+            return
         if op=='generate':
             if not self.repo:raise ValueError('Generation requires --kimodo-repo')
+            cfg = validate_cfg_weights(p.get('cfgWeights'))
             if p.get('airReference'):
                 from .air import materialize_constraints
                 constraints,constraint_receipt=materialize_constraints(p,self.motion(p['airReference']),rig)
@@ -302,6 +318,8 @@ class Runner:
                   '--duration',str(p['seconds']),'--seed',str(p['seed']),
                   '--diffusion_steps',str(p['steps']),'--constraints',str(folder/'constraints.json'),
                   '--output',str(folder/'generated')]
+            if cfg is not None:
+                args += ['--cfg_type','separated','--cfg_weight',*[str(value) for value in cfg]]
             if p.get('postProcessing',True) is False:
                 args.append('--no-postprocess')
             env=self.backend_env.copy();env.setdefault('TEXT_ENCODER_DEVICE','cpu')
@@ -338,9 +356,11 @@ class Runner:
                     model=self.models[p['model']]
                     seed_everything(p['seed'])
                     constraints_lst=load_constraints_lst(str(folder/'constraints.json'),model.skeleton)
+                    guidance = dict(cfg_type='separated', cfg_weight=cfg) if cfg is not None else {}
                     output=model([p['prompt']],[int(p['seconds']*p['fps'])],constraint_lst=constraints_lst,
                                  num_denoising_steps=p['steps'],num_samples=1,multi_prompt=True,
-                                 num_transition_frames=5,post_processing=p.get('postProcessing',True),return_numpy=True)
+                                 num_transition_frames=5,post_processing=p.get('postProcessing',True),return_numpy=True,
+                                 **guidance)
                     sample={k:(v[0] if hasattr(v,'shape') and len(v.shape)>0 and v.shape[0]==1 else v) for k,v in output.items()}
                     save_kimodo_npz(str(folder/'generated.npz'),sample)
             else:
@@ -434,7 +454,12 @@ class Runner:
                 target_period_frames=p.get('targetPeriodFrames'),constrained_cycle_span=span,
                 contact_reference=None if reference is None else self.motion(reference),
                 ramp_frames=p.get('rampFrames',3),minimum_knee_bend_degrees=p.get('minimumKneeBendDegrees',0),
-                fit_regularization=p.get('fitRegularization',.002),enforce_sole_clearance=p.get('enforceSoleClearance',False))
+                fit_regularization=p.get('fitRegularization',.002),enforce_sole_clearance=p.get('enforceSoleClearance',False),
+                contact_padding_frames=p.get('contactPaddingFrames',0),
+                flat_stance=p.get('flatStance',False),seam_smoothing_frames=p.get('seamSmoothingFrames',0),
+                stabilize_knee_poles=p.get('stabilizeKneePoles',False),both_support_seams=p.get('bothSupportSeams',False),
+                stance_residual_lock=p.get('stanceResidualLock',False),
+                stance_residual_padding_frames=p.get('stanceResidualPaddingFrames',0))
             write_json(folder/'periodic-repair.json',repair_report)
             if not repair_report['after']['pass']:
                 m.save_motion(folder/'rejected-repair.npz',motion,rig)

@@ -17,7 +17,7 @@ from .motion import complete, fk, validate_motion
 
 
 DEFAULT_POLICY = {
-    'version': 'soma-gait-authoring-v2-native-rest',
+    'version': 'soma-gait-authoring-v3-unique-period',
     'acceptanceScope': 'authoring_landmarks_only',
     'groundHeightMeters': 0.,
     'contactEnterHeightMeters': .035,
@@ -205,13 +205,16 @@ def detect_foot_contacts(points, fps, policy=None, *, cycle_displacement=None):
                 events.append({'frame': start, 'time': start / fps, 'side': side, 'kind': 'touchdown'})
             if stop < len(points):
                 events.append({'frame': stop, 'time': stop / fps, 'side': side, 'kind': 'liftoff'})
-        near = height[:, index] <= p['contactLeaveHeightMeters']
-        speeds = horizontal[:, index][near]
+        measured_height = height[:-1, index] if cycle_frames is not None else height[:, index]
+        measured_speed = horizontal[:-1, index] if cycle_frames is not None else horizontal[:, index]
+        measured_contact = contact[:-1, index] if cycle_frames is not None else contact[:, index]
+        near = measured_height <= p['contactLeaveHeightMeters']
+        speeds = measured_speed[near]
         measurements[side] = {
             'nearGroundSamples': int(near.sum()),
             'nearGroundMedianSpeedMps': float(np.median(speeds)) if len(speeds) else None,
             'nearGroundP95SpeedMps': float(np.percentile(speeds, 95)) if len(speeds) else None,
-            'contactFrames': int(contact[:, index].sum()),
+            'contactFrames': int(measured_contact.sum()),
             'minimumHeightMeters': float(height[:, index].min()),
             'maximumHeightMeters': float(height[:, index].max()),
         }
@@ -219,7 +222,9 @@ def detect_foot_contacts(points, fps, policy=None, *, cycle_displacement=None):
             'support': support, 'contacts': contact.astype(int).tolist(),
             'sampleContacts': sample_contact.astype(int).tolist(),
             'heightsMeters': height.tolist(), 'horizontalSpeedMps': horizontal.tolist(),
-            'measurements': measurements}
+            'measurements': measurements,
+            'measurementFrameCount': len(height) - int(cycle_frames is not None),
+            'measurementDomain': 'unique_cycle_frames' if cycle_frames is not None else 'all_frames'}
 
 
 def detect_gait_events(motion, rig, policy=None, *, cyclic=False):
@@ -264,7 +269,7 @@ def support_stages(contact, events):
     return stages
 
 
-def _cycle_metrics(motion, start, end, rig, detection, policy):
+def _cycle_metrics(motion, start, end, rig, detection, policy, anchor_side='left'):
     fps = float(motion['fps'])
     local = motion['local_rot_mats'][start:end + 1]
     root = motion['root_positions'][start:end + 1]
@@ -277,8 +282,9 @@ def _cycle_metrics(motion, start, end, rig, detection, policy):
     velocity = np.gradient(body, 1 / fps, axis=0)
     initial_angular = Rotation.from_matrix(local[1] @ local[0].swapaxes(-1, -2)).as_rotvec() * fps
     final_angular = Rotation.from_matrix(local[-1] @ local[-2].swapaxes(-1, -2)).as_rotvec() * fps
+    opposite_side = 'right' if anchor_side == 'left' else 'left'
     opposite = [event['frame'] for event in detection['events']
-                if event['kind'] == 'touchdown' and event['side'] == 'right' and start < event['frame'] < end]
+                if event['kind'] == 'touchdown' and event['side'] == opposite_side and start < event['frame'] < end]
     phase = (opposite[0] - start) / (end - start) if len(opposite) == 1 else None
     metrics = {'start': start, 'endInclusive': end, 'durationSeconds': duration,
                'oppositeTouchdowns': opposite, 'oppositePhase': phase,
@@ -306,12 +312,14 @@ def _cycle_metrics(motion, start, end, rig, detection, policy):
     return metrics
 
 
-def audit_candidate(motion, rig, expected_speed_mps=None, policy=None):
+def audit_candidate(motion, rig, expected_speed_mps=None, policy=None, *, anchor_side='left'):
+    if anchor_side not in ('left', 'right'):
+        raise ValueError('Cycle anchor side must be left or right')
     p = _policy(policy)
     detection = detect_gait_events(motion, rig, p)
     starts = [event['frame'] for event in detection['events']
-              if event['kind'] == 'touchdown' and event['side'] == 'left']
-    cycles = [_cycle_metrics(motion, a, b, rig, detection, p) for a, b in zip(starts, starts[1:])]
+              if event['kind'] == 'touchdown' and event['side'] == anchor_side]
+    cycles = [_cycle_metrics(motion, a, b, rig, detection, p, anchor_side) for a, b in zip(starts, starts[1:])]
     checks = [_check('complete_cycles', len(cycles) >= p['minimumCompleteCycles'],
                      len(cycles), p['minimumCompleteCycles'])]
     if expected_speed_mps is not None and (not math.isfinite(expected_speed_mps) or expected_speed_mps <= 0):
@@ -323,7 +331,7 @@ def audit_candidate(motion, rig, expected_speed_mps=None, policy=None):
     speeds = np.asarray(detection['horizontalSpeedMps'])
     contacts = np.asarray(detection['contacts'])
     for cycle in cycles:
-        span = slice(cycle['start'], cycle['endInclusive'] + 1)
+        span = slice(cycle['start'], cycle['endInclusive'])
         measurements = {}
         for index, side in enumerate(('left', 'right')):
             h, v = heights[span, index], speeds[span, index]
@@ -331,7 +339,7 @@ def audit_candidate(motion, rig, expected_speed_mps=None, policy=None):
             count = int(near.sum())
             median = float(np.median(v[near])) if count else None
             support_count = int(contacts[span, index].sum())
-            minimum_height = float(h.min())
+            minimum_height = float(heights[cycle['start']:cycle['endInclusive'] + 1, index].min())
             measurements[side] = {'nearGroundSamples': count, 'nearGroundMedianSpeedMps': median,
                                   'contactFrames': support_count, 'minimumHeightMeters': minimum_height}
             cycle['checks'] += [
@@ -373,20 +381,21 @@ def audit_candidate(motion, rig, expected_speed_mps=None, policy=None):
         'sourceFrameCount': len(motion['root_positions']), 'fps': float(motion['fps']),
         'expectedSpeedMps': expected_speed_mps, 'detection': detection, 'cycles': cycles,
         'selectedCycle': chosen, 'stableWindows': windows, 'checks': checks,
+        'cycleAnchorSide': anchor_side, 'measurementDomain': 'unique_cycle_frames',
         'pass': all(check['pass'] for check in checks),
         'targetSkinAndRuntimeAcceptanceRequired': True}
     return receipt
 
 
-def author_cycle(motion, rig, target_count=None, expected_speed_mps=None, policy=None):
-    """Select an observed left-to-left cycle; preserve trajectory and derivatives.
+def author_cycle(motion, rig, target_count=None, expected_speed_mps=None, policy=None, *, anchor_side='left'):
+    """Select an observed same-foot cycle; preserve trajectory and derivatives.
 
     The returned motion has an inclusive cycle endpoint. Source poses are only
     interpolated in time, never closed by modifying the final pose. A linear
     planar travel transform, including the crop origin, is removed; pelvis sway
     and vertical bob remain. Its exact inverse is included in the receipt.
     """
-    receipt = audit_candidate(motion, rig, expected_speed_mps, policy)
+    receipt = audit_candidate(motion, rig, expected_speed_mps, policy, anchor_side=anchor_side)
     if not receipt['pass']:
         raise GaitValidationError(receipt)
     p, cycle = receipt['policy'], receipt['selectedCycle']
@@ -428,16 +437,17 @@ def author_cycle(motion, rig, target_count=None, expected_speed_mps=None, policy
     # Re-detect interior events in the final time domain. The boundary landing
     # was observed in the source before cropping, so it can be reinstated only
     # when that same foot remains in contact at both resampled endpoints.
-    boundary_valid = bool(reconstructed_detection['contacts'][0][0] and
-                          reconstructed_detection['contacts'][-1][0])
-    receipt['checks'].append(_check('canonical_left_contact_boundary', boundary_valid, boundary_valid))
+    anchor_index = 0 if anchor_side == 'left' else 1
+    boundary_valid = bool(reconstructed_detection['contacts'][0][anchor_index] and
+                          reconstructed_detection['contacts'][-1][anchor_index])
+    receipt['checks'].append(_check('canonical_' + anchor_side + '_contact_boundary', boundary_valid, boundary_valid))
     events = list(reconstructed_detection['events'])
     if boundary_valid:
-        events += [{'frame': 0, 'time': 0., 'side': 'left', 'kind': 'touchdown'},
-                   {'frame': count - 1, 'time': duration, 'side': 'left', 'kind': 'touchdown'}]
+        events += [{'frame': 0, 'time': 0., 'side': anchor_side, 'kind': 'touchdown'},
+                   {'frame': count - 1, 'time': duration, 'side': anchor_side, 'kind': 'touchdown'}]
     events.sort(key=lambda event: (event['frame'], event['side'], event['kind']))
     reconstructed_detection['events'] = events
-    final_metrics = _cycle_metrics(reconstructed, 0, count - 1, rig, reconstructed_detection, p)
+    final_metrics = _cycle_metrics(reconstructed, 0, count - 1, rig, reconstructed_detection, p, anchor_side)
     for check in final_metrics['checks']:
         receipt['checks'].append(dict(check, name='retimed_' + check['name']))
     if not events:
@@ -471,18 +481,56 @@ def author_cycle(motion, rig, target_count=None, expected_speed_mps=None, policy
     return result, receipt
 
 
-def mirror_authored_cycle(source, base, rig, receipt, *, reverse_time=False,repair_derived=False):
-    """Mirror travel and body together, then measure the new left-foot phase.
-
-    A mirrored support event changes sides. Repeating the reconstructed cycle
-    lets the independent detector select a new left-to-left interval instead
-    of copying the old left marker or assuming a half-period phase offset.
-    """
-    from .motion import mirror
+def revalidate_authored_cycle(source, rig, receipt):
+    """Recheck an unchanged bound cycle with current sampling and thresholds."""
     validate_motion(source, rig)
     if not receipt.get('pass') or receipt.get('outputMotionSha256') != _array_hash(
             source['local_rot_mats'], source['root_positions'], source['fps']):
-        raise ValueError('Mirroring requires the unchanged accepted gait master')
+        raise ValueError('Revalidation requires the unchanged accepted gait master')
+    removed = np.asarray(receipt['removedPlanarTrajectory']['positions'], dtype=float)
+    if removed.shape != source['root_positions'].shape or not np.isfinite(removed).all():
+        raise ValueError('Gait revalidation requires its complete authoring trajectory')
+    policy = _policy(receipt['policy'])
+    policy['version'] = DEFAULT_POLICY['version']
+    anchor_side = receipt.get('cycleAnchorSide', 'left')
+    if anchor_side not in ('left', 'right'):
+        raise ValueError('Invalid bound cycle anchor side')
+    travel = complete(source['local_rot_mats'], source['root_positions'] + removed, rig, float(source['fps']))
+    detection = detect_gait_events(travel, rig, policy, cyclic=True)
+    cycle = _cycle_metrics(travel, 0, len(removed) - 1, rig, detection, policy, anchor_side)
+    checks = list(cycle['checks'])
+    anchor_index = 0 if anchor_side == 'left' else 1
+    checks.append(_check('bound_contact_boundary', bool(detection['contacts'][0][anchor_index] and
+                         detection['contacts'][-1][anchor_index]), anchor_side))
+    for side in ('left', 'right'):
+        measured = detection['measurements'][side]
+        median = measured['nearGroundMedianSpeedMps']
+        checks += [
+            _check(side + '_geometric_slip', median is not None and
+                   median <= policy['maximumNearGroundMedianSpeedMps'], median, policy['maximumNearGroundMedianSpeedMps']),
+            _check(side + '_near_ground_samples', measured['nearGroundSamples'] >= policy['minimumNearGroundSamplesPerFoot'],
+                   measured['nearGroundSamples'], policy['minimumNearGroundSamplesPerFoot']),
+            _check(side + '_observed_support', measured['contactFrames'] > 0, measured['contactFrames']),
+            _check(side + '_penetration', measured['minimumHeightMeters'] >= -policy['maximumPenetrationMeters'],
+                   measured['minimumHeightMeters'], -policy['maximumPenetrationMeters'])]
+    speed = receipt['actualAuthoredSpeedMps']
+    error = abs(cycle['speedMps'] / speed - 1)
+    checks.append(_check('bound_authored_speed', error <= policy['maximumSpeedRelativeError'],
+                         error, policy['maximumSpeedRelativeError']))
+    report = dict(policy=policy, cycleAnchorSide=anchor_side, checks=checks,
+                  policySha256=hashlib.sha256(json.dumps(policy, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+                  transformedDetection=detection, transformedCycleMetrics=cycle,
+                  outputMotionSha256=receipt['outputMotionSha256'], pass_=all(c['pass'] for c in checks))
+    report['pass'] = report.pop('pass_')
+    if not report['pass']:
+        raise GaitValidationError(report)
+    return report
+
+
+def reflected_gait_reference(source,base,rig,receipt,*,reverse_time=False):
+    """Reflect accepted parent travel; the returned condition is not a delivery."""
+    from .motion import mirror
+    revalidate_authored_cycle(source, rig, receipt)
     removed = np.asarray(receipt['removedPlanarTrajectory']['positions'], dtype=float)
     if removed.shape != source['root_positions'].shape or not np.isfinite(removed).all():
         raise ValueError('Mirrored gait requires the complete measured authoring trajectory')
@@ -504,10 +552,19 @@ def mirror_authored_cycle(source, base, rig, receipt, *, reverse_time=False,repa
     repeated = complete(reflected['local_rot_mats'][frames % period].copy(),
         reflected['root_positions'][frames % period] + (frames // period)[:, None] * displacement,
         rig, float(source['fps']))
+    return repeated,period
+
+
+def mirror_authored_cycle(source, base, rig, receipt, *, reverse_time=False,repair_derived=False):
+    """Reflect complete travel, then independently re-detect swapped support."""
+    repeated,period=reflected_gait_reference(source,base,rig,receipt,reverse_time=reverse_time)
+    parent_side = receipt.get('cycleAnchorSide', 'left')
+    anchor_side = 'left' if reverse_time else ('right' if parent_side == 'left' else 'left')
+    policy = dict(receipt['policy'], version=DEFAULT_POLICY['version'])
     attempts=[]
     try:
-        result, mirrored_receipt = author_cycle(repeated, rig, len(removed),
-            receipt['actualAuthoredSpeedMps'], receipt['policy'])
+        result, mirrored_receipt = author_cycle(repeated, rig, period+1,
+            receipt['actualAuthoredSpeedMps'], policy, anchor_side=anchor_side)
     except GaitValidationError as original_error:
         if not repair_derived:raise
         from .periodic_repair import repair_periodic
@@ -518,8 +575,8 @@ def mirror_authored_cycle(source, base, rig, receipt, *, reverse_time=False,repa
                     enforce_sole_clearance=True,minimum_knee_bend_degrees=15,fit_regularization=regularization)
                 attempts.append(report)
                 if report['after']['pass']:
-                    result,mirrored_receipt=author_cycle(repaired,rig,len(removed),
-                        receipt['actualAuthoredSpeedMps'],receipt['policy'])
+                    result,mirrored_receipt=author_cycle(repaired,rig,period+1,
+                        receipt['actualAuthoredSpeedMps'],policy,anchor_side=anchor_side)
                     mirrored_receipt['derivedPeriodicRepair']=report
                     break
             except ValueError as error:
@@ -528,6 +585,7 @@ def mirror_authored_cycle(source, base, rig, receipt, *, reverse_time=False,repa
             original_error.receipt['derivedRepairAttempts']=attempts
             raise original_error
     mirrored_receipt['mirrorProvenance'] = dict(sourceOutputMotionSha256=receipt['outputMotionSha256'],
-        policy='native neutral reflection of complete travel; re-detect swapped events; canonical left touchdown',
+        policy='native neutral reflection of complete travel; preserve cycle phase with swapped support anchor',
+        sourceCycleAnchorSide=parent_side, mirroredCycleAnchorSide=anchor_side,
         reversedTime=bool(reverse_time),sourceEvents=receipt['events'])
     return result, mirrored_receipt

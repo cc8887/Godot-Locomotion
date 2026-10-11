@@ -3,7 +3,7 @@ import copy
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
-from .gait_constraints import solve_foot_ik
+from .gait_constraints import solve_foot_ik, _rotation_between
 from .motion import fk
 
 
@@ -24,17 +24,16 @@ def cleanup_walk(raw, skeleton, source_gate, *, phase_shift=1, max_ankle_cm=8., 
     return result, report
 
 
-def repair_periodic_gait(raw, skeleton, source):
+def repair_periodic_gait(raw, skeleton, source, *, phase_harmonics=3):
     from .target_phase import infer_phases
     from .target_gait import PILOTS, DIRECTIONS, asset_name, original_protocol
     name = asset_name(source)
-    phase = infer_phases(raw, skeleton, source)
     speed, kind = PILOTS[name]
-    if original_protocol()['assets'][kind]['contactMode'] != 'flat_sole':
-        raise ValueError('Periodic IK currently requires a flat-sole contact contract')
+    contact_mode=original_protocol()['assets'][kind]['contactMode']
+    phase = infer_phases(raw, skeleton, source,contact_mode=contact_mode, harmonics=phase_harmonics)
     try:
         result, report = _cleanup_contacts(raw, skeleton, np.asarray(phase['candidateContacts'], bool),
-            speed, DIRECTIONS[name], phase_shift=0)
+            speed, DIRECTIONS[name], phase_shift=0,contact_mode=contact_mode)
     except ValueError as error:
         raise TargetContactRepairError(error, phase) from error
     report.update(phasePolicy=phase['policy'], passed=True, applied=True)
@@ -42,9 +41,11 @@ def repair_periodic_gait(raw, skeleton, source):
 
 
 def _cleanup_contacts(raw, skeleton, observed, speed, direction, *, phase_shift=0,
-                      max_ankle_cm=8., max_hip_cm=5.):
+                      max_ankle_cm=8., max_hip_cm=5.,contact_mode='flat_sole'):
     from .publish import world_pose
     result = copy.deepcopy(raw); count = raw['sampledKeyCount']; period = count-1
+    if contact_mode not in ('flat_sole','toe'):
+        raise ValueError('Unsupported target contact mode')
     if observed.shape != (count, 2):
         raise ValueError('Candidate phase contact dimensions differ')
     indices = (np.arange(count)-phase_shift) % period if phase_shift else np.arange(count)
@@ -66,6 +67,7 @@ def _cleanup_contacts(raw, skeleton, observed, speed, direction, *, phase_shift=
     target = np.stack([world['foot_'+s][1] for s in ('l', 'r')], axis=1).copy()
     target_rot = np.stack([world['foot_'+s][0] for s in ('l', 'r')], axis=1).copy()
     toe_rot = np.stack([local[:, lookup['ball_'+s]] for s in ('l', 'r')], axis=1).copy()
+    maximum_roll_correction=0.
     for side, suffix in enumerate(('l', 'r')):
         foot, ball = 'foot_'+suffix, 'ball_'+suffix
         f_idx, b_idx = lookup[foot], lookup[ball]
@@ -88,17 +90,36 @@ def _cleanup_contacts(raw, skeleton, observed, speed, direction, *, phase_shift=
             advancing = np.zeros((len(span), 3))
             advancing[:, :2] = span[:, None]*(raw['playLength']/period)*speed*np.asarray(direction)
             heels = world[foot][1][wrapped]+np.einsum('tij,j->ti', world[foot][0][wrapped], heel_offset)+advancing
-            anchor = np.median(heels, axis=0); anchor[2] = 0
+            samples=(world[ball][1][wrapped]+np.einsum('tij,j->ti',world[ball][0][wrapped],toe_offset)+advancing
+                     if contact_mode=='toe' else heels)
+            anchor = np.median(samples, axis=0); anchor[2] = 0
             ankle = anchor-rotation@heel_offset
             for unwrapped in range(first-2, stop+2):
                 frame = unwrapped % period
                 alpha = min(1., (unwrapped-first+2)/2, (stop+1-unwrapped)/2)
                 alpha = np.clip(alpha, 0, 1); alpha = alpha*alpha*(3-2*alpha)
                 advancing = np.zeros(3); advancing[:2] = unwrapped*(raw['playLength']/period)*speed*np.asarray(direction)
+                if contact_mode=='toe':
+                    # Lift only a sinking heel, rotating around the pinned toe.
+                    toe_vector=positions[frame,b_idx]+local[frame,b_idx]@toe_offset
+                    heel_from_toe=world[foot][0][frame]@(heel_offset-toe_vector)
+                    desired=world[foot][0][frame]
+                    if heel_from_toe[2]<0:
+                        horizontal=heel_from_toe.copy();horizontal[2]=0
+                        if np.linalg.norm(horizontal)<1e-6:raise ValueError('Unresolved forefoot pitch')
+                        pitch=_rotation_between(heel_from_toe,horizontal)
+                        angle=float(np.rad2deg(np.linalg.norm(Rotation.from_matrix(pitch).as_rotvec())))
+                        if angle>20.:raise ValueError('Target forefoot pitch correction exceeds 20 degrees')
+                        maximum_roll_correction=max(maximum_roll_correction,angle*alpha)
+                        desired=pitch@desired
+                    target_rot[frame,side]=Slerp([0,1],Rotation.from_matrix(np.stack([world[foot][0][frame],desired])))([alpha]).as_matrix()[0]
+                    ball_vector=target_rot[frame,side]@toe_vector
+                    ankle=anchor-ball_vector
                 target[frame, side] = world[foot][1][frame]*(1-alpha)+(ankle-advancing)*alpha
-                target_rot[frame, side] = Slerp([0, 1], Rotation.from_matrix(np.stack([world[foot][0][frame], rotation])))([alpha]).as_matrix()[0]
-                reference = Rotation.from_quat(skeleton['referencePose'][b_idx]['rotation']).as_matrix()
-                toe_rot[frame, side] = Slerp([0, 1], Rotation.from_matrix(np.stack([local[frame, b_idx], reference])))([alpha]).as_matrix()[0]
+                if contact_mode=='flat_sole':
+                    target_rot[frame, side] = Slerp([0, 1], Rotation.from_matrix(np.stack([world[foot][0][frame], rotation])))([alpha]).as_matrix()[0]
+                    reference = Rotation.from_quat(skeleton['referencePose'][b_idx]['rotation']).as_matrix()
+                    toe_rot[frame, side] = Slerp([0, 1], Rotation.from_matrix(np.stack([local[frame, b_idx], reference])))([alpha]).as_matrix()[0]
         # Preserve the repeated pose endpoint; the reconstructed world travel
         # still advances one complete stride across the seam.
         target[-1, side] = target[0, side]
@@ -141,6 +162,8 @@ def _cleanup_contacts(raw, skeleton, observed, speed, direction, *, phase_shift=
         if index == pelvis:
             tracks[name.lower()]['positions'] = positions[:, index].tolist()
     report = dict(method='target_world_stance_ik_v1', phaseShiftFrames=phase_shift,
+                  contactMode=contact_mode,
+                  maximumFootRollCorrectionDegrees=maximum_roll_correction,
                   maximumAnkleCorrectionCm=correction, maximumHipLoweringCm=max(changes),
                   expectedSpeedCmS=speed, travelDirectionXY=list(direction), qualityGateRequired=True)
     return result, report

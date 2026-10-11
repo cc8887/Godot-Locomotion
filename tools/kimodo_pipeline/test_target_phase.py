@@ -64,6 +64,43 @@ class TargetPhaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     infer_phases(self.original['raw'], self.skeleton, self.original['source'])
 
+    def test_closed_alternation_boundary_does_not_fail_float_subtraction(self):
+        raw=copy.deepcopy(self.original['raw'])
+        raw.update(sampledKeyCount=21,playLength=20/30)
+        angle=np.arange(21)*2*np.pi/20
+        for shift,accepted in ((7,True),(13,True),(6,False),(14,False)):
+            points=np.zeros((21,2,2,3))
+            points[:,0,:,2]=(6*(1-np.cos(angle)))[:,None]
+            points[:,1,:,2]=(6*(1-np.cos(angle-shift*2*np.pi/20)))[:,None]
+            with patch('tools.kimodo_pipeline.target_phase._sole_geometry',return_value=(points,None,None)):
+                if accepted:
+                    phase=infer_phases(raw,self.skeleton,self.original['source'])
+                    self.assertEqual(shift/20,phase['troughPhaseGap'])
+                else:
+                    with self.assertRaisesRegex(ValueError,'do not alternate'):
+                        infer_phases(raw,self.skeleton,self.original['source'])
+
+    def test_configured_smoothing_still_requires_independent_alternating_vertical_evidence(self):
+        for harmonics in (1, 2, 3):
+            with patch('tools.kimodo_pipeline.target_phase._sole_geometry',
+                       return_value=(self.synthetic(same_phase=True), None, None)):
+                with self.assertRaisesRegex(ValueError, 'do not alternate'):
+                    infer_phases(self.original['raw'], self.skeleton, self.original['source'], harmonics=harmonics)
+        for harmonics in (0, True, 1.5, self.original['raw']['sampledKeyCount']):
+            with self.assertRaisesRegex(ValueError, 'Invalid phase'):
+                infer_phases(self.original['raw'], self.skeleton, self.original['source'], harmonics=harmonics)
+
+    def test_configured_smoothing_does_not_turn_a_bad_repair_into_quality_acceptance(self):
+        raw = copy.deepcopy(self.original['raw'])
+        for track in raw['tracks']:
+            if track['bone'].lower() == 'pelvis':
+                for position in track['positions']:
+                    position[2] += 3
+        repaired, _, _ = repair_periodic_gait(raw, self.skeleton, self.original['source'], phase_harmonics=2)
+        self.assertFalse(analyze_target_gait(repaired, self.skeleton, self.original['source'])['passed'])
+        default, _, _ = repair_periodic_gait(raw, self.skeleton, self.original['source'])
+        self.assertTrue(analyze_target_gait(default, self.skeleton, self.original['source'])['passed'])
+
     def test_wrapped_low_phase_and_noise_keep_periodic_contact_identity(self):
         points = self.synthetic(offset=30)
         rng = np.random.default_rng(11)

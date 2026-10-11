@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections import Counter
 from pathlib import Path
@@ -19,6 +20,16 @@ def digest(value):
 
 def read_json(path):
     return json.loads(Path(path).read_text(encoding='utf-8-sig'))
+
+
+def validate_cfg_weights(weights):
+    if weights is None:
+        return None
+    if (not isinstance(weights, (list, tuple)) or len(weights) != 2 or
+            any(isinstance(value, bool) or not isinstance(value, (int, float)) or
+                not math.isfinite(value) or value < 0 for value in weights)):
+        raise ValueError('Separated Kimodo CFG requires two finite nonnegative weights: text, constraints')
+    return [float(value) for value in weights]
 
 
 def load_rules(path, seen=None):
@@ -107,6 +118,18 @@ def build_graph(contracts, rules):
         allowed_gaits.add('Sprint_Acceleration')
     if set(gait_closure) - allowed_gaits:
         raise ValueError('Gait closure requires a native looping locomotion source')
+    independent_gaits=set()
+    for name,spec in gait_closure.items():
+        independent=spec.get('independentGeneration',False)
+        if not isinstance(independent,bool):raise ValueError('Independent gait generation must be a boolean')
+        if independent:
+            if (name not in ('Run_Right_Forward','Run_Right_Backward')
+                    or spec.get('constraintReference') not in ('native_als','generated_mirror') or not spec.get('repairAfterGeneration')):
+                raise ValueError('Independent right Run requires measured constraints and the unchanged source gates')
+            if (spec.get('constraintReference')=='generated_mirror'
+                    and spec.get('constraintSource')!=name.replace('Right','Left')):
+                raise ValueError('Generated mirror conditions require the corresponding accepted left Run')
+            independent_gaits.add(name)
     overrides = rules.get('locomotionOverrides', {})
     if set(overrides) - allowed_gaits:
         raise ValueError('Locomotion overrides require native looping locomotion sources')
@@ -156,6 +179,9 @@ def build_graph(contracts, rules):
                       fps=rules['fps'], seed=rules['seed'], model=rules['model'],
                       steps=rules['diffusionSteps'], anchors=list(anchors), rootPath=path,
                       semantic=row['semanticName'])
+        cfg = validate_cfg_weights(rules.get('generationCfgWeights'))
+        if cfg is not None:
+            params['cfgWeights'] = cfg
         if row['family']=='idle_additive':
             params['endEffectors']=[{'type':kind,'source':deps[0],'at':[0,.5,1]} for kind in ('left-foot','right-foot')]
         elif row['family'] in ('weapon_cycle','weapon_start') or 'Crouch_Rifle' in row['semanticName']:
@@ -177,10 +203,11 @@ def build_graph(contracts, rules):
         exact_base = None
         if ev['baseAsset']:
             exact_base = reference(by_source[ev['baseAsset']]['semanticName'], ev['baseFrame'])
-        # Right variants are derived, never separate random samples.
+        # Derive right variants unless an explicit gated Run profile selects generation.
         left = name.replace('Right', 'Left')
         mirrored = left != name and left in by_name and family in {
             'gait_cycle', 'jump', 'turn', 'rotate', 'foot_transition', 'gait_pose'}
+        if name in independent_gaits:mirrored=False
         if family=='gait_pose':
             parent_name=name.removesuffix('_Pose')
             if parent_name not in by_name:parent_name+='_Forward'
@@ -372,6 +399,13 @@ def build_graph(contracts, rules):
                     add(reference_node,'native_gait_reference',['rig:soma'],
                         indexPath='assets/config/refactored_animation_sources.json',source=row['source'],
                         expectedSpeedMps=path['velocity'],direction=path['direction'])
+                    if 'constraintSeamSmoothingFrames' in spec:
+                        nodes[reference_node]['params']['seamSmoothingFrames'] = spec['constraintSeamSmoothingFrames']
+                        nodes[reference_node]['params']['seamSmoothingMask'] = spec.get('constraintSeamSmoothingMask','all')
+                elif spec.get('constraintReference')=='generated_mirror':
+                    parent=motion(spec['constraintSource'])
+                    reference_node='reference:'+name+':generated-mirror'
+                    add(reference_node,'mirrored_gait_reference',['rig:soma',parent,base],source=parent,base=base)
                 elif spec.get('repairReference'):
                     reference_node = 'reference:' + name + ':repaired'
                     add(reference_node, 'periodic_repair', ['rig:soma', discovery], source=discovery,
@@ -385,12 +419,15 @@ def build_graph(contracts, rules):
                     boundaryContextFrames=spec.get('boundaryContextFrames', 0))
                 if override:
                     nodes[candidate]['params'].update(matchStrideToPeriod=True,
-                        fullBodyPhaseFractions=[.25, .5, .75])
+                        fullBodyPhaseFractions=spec.get('fullBodyPhaseFractions',[.25, .5, .75]))
                 if spec.get('maximumConstraintCycles'):
                     nodes[candidate]['params']['maximumConstraintCycles'] = spec['maximumConstraintCycles']
                 for option in ('fullBodyPhaseCycles','supportAnchorCount','supportPairSpacingSeconds',
-                               'supportWindowFraction','maximumAnchorCorrectionMeters','constrainHandOrientations'):
+                               'supportWindowFraction','maximumAnchorCorrectionMeters','constrainHandOrientations',
+                               'footBoundaryContextFrames','preserveReferenceHeading'):
                     if option in spec:nodes[candidate]['params'][option]=spec[option]
+                if 'cfgWeights' in spec:
+                    nodes[candidate]['params']['cfgWeights'] = validate_cfg_weights(spec['cfgWeights'])
                 selected_source = candidate
                 if spec.get('repairAfterGeneration'):
                     selected_source='repair:'+name+':generated'
@@ -399,7 +436,13 @@ def build_graph(contracts, rules):
                         expectedSpeedMps=path['velocity'],targetPeriodFrames=row['originalTiming']['sampledKeyCount']-1,
                         harmonics=spec.get('finalRepairHarmonics',3),rampFrames=spec.get('repairRampFrames',4),
                         minimumKneeBendDegrees=spec.get('minimumKneeBendDegrees',15),
-                        fitRegularization=spec.get('fitRegularization',.02),enforceSoleClearance=True)
+                        fitRegularization=spec.get('fitRegularization',.02),enforceSoleClearance=True,
+                        contactPaddingFrames=spec.get('contactPaddingFrames',0),
+                        flatStance=spec.get('flatStance',False),seamSmoothingFrames=spec.get('repairSeamSmoothingFrames',0),
+                        stabilizeKneePoles=spec.get('stabilizeKneePoles',False),
+                        bothSupportSeams=spec.get('repairBothSupportSeams',False),
+                        stanceResidualLock=spec.get('repairStanceResidualLock',False),
+                        stanceResidualPaddingFrames=spec.get('repairStanceResidualPaddingFrames',0))
                 if spec.get('selectBestReference'):
                     if not spec.get('repairReference'):
                         raise ValueError('Best-reference selection requires a repaired reference')
@@ -447,6 +490,12 @@ def build_graph(contracts, rules):
         closure_name = name if name in gait_closure else name.replace('Right', 'Left')
         if closure_name in gait_closure and row['family'] != 'gait_pose':
             row = dict(row, targetGaitPolicy='als-forward-v1')
+            if 'targetPhaseHarmonics' in gait_closure[closure_name]:
+                phase_harmonics = gait_closure[closure_name]['targetPhaseHarmonics']
+                if (not isinstance(phase_harmonics, int) or isinstance(phase_harmonics, bool)
+                        or not 1 <= phase_harmonics <= (row['originalTiming']['sampledKeyCount']-1)//2):
+                    raise ValueError('Target phase harmonics must be a positive integer within the cycle bandwidth')
+                row['targetPhaseHarmonics'] = phase_harmonics
             if gait_closure[closure_name].get('upperBodyIdleReference'):
                 row['targetUpperBodyPolicy'] = 'walk-idle-relative-upper-body-v1'
             if gait_closure[closure_name].get('targetCleanup'):

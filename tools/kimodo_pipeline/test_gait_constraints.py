@@ -28,6 +28,81 @@ def decode(constraint, rig):
 
 
 class GaitConstraintTests(unittest.TestCase):
+    def test_preserved_reference_heading_keeps_oblique_planted_leg_geometry(self):
+        source, rig = walking_fixture(seconds=5.)
+        rotation = Rotation.from_euler('y', 25, degrees=True).as_matrix()
+        local = source['local_rot_mats'].copy()
+        local[:, 0] = rotation @ local[:, 0]
+        source = complete(local, source['root_positions'] @ rotation.T, rig, 60)
+        params = parameters()
+        params['rootPath']['direction'] = (rotation @ np.array([0., 0., 1.]))[[0, 2]].tolist()
+        params.update(preserveReferenceHeading=True, matchStrideToPeriod=True,
+                      fullBodyPhaseFractions=[.25, .5, .75])
+        constraints, receipt = materialize_gait_constraints(params, source, rig)
+        first = receipt['selectedReferenceCycle']['start']
+        pinned_frames = {frame for pair in receipt['supportPairs'] for frame in pair['frames']}
+        body = decode(next(c for c in constraints if c['type'] == 'fullbody'), rig)
+        for frame, (_, root, _, joints) in body.items():
+            if frame in pinned_frames:
+                continue
+            expected = source['posed_joints'][first + frame % 60]
+            translation = root - source['root_positions'][first + frame % 60]
+            np.testing.assert_allclose(joints, expected + translation, atol=1e-9)
+        for pair in receipt['supportPairs']:
+            self.assertLess(pair['maximumPositionErrorMeters'], 1e-9)
+        self.assertLess(receipt['maximumHeadingErrorRadians'], 1e-10)
+        self.assertLess(max(receipt['constraintCounts'].values()), 20)
+        # The original constant-heading mode would rotate these legs away
+        # from the direction of their planted world-space anchors.
+        params['preserveReferenceHeading'] = False
+        fixed, _ = materialize_gait_constraints(params, source, rig)
+        fixed_body = decode(next(c for c in fixed if c['type'] == 'fullbody'), rig)
+        self.assertGreater(np.linalg.norm(body[15][3][3] - fixed_body[15][3][3]), .04)
+
+    def test_phase_varying_reference_heading_matches_every_sparse_constraint(self):
+        source, rig = walking_fixture(seconds=5.)
+        local = source['local_rot_mats'].copy()
+        yaw = .02 * np.sin(np.arange(len(local)) * 2 * np.pi / 60)
+        local[:, 0] = Rotation.from_euler('y', yaw[:, None]).as_matrix() @ local[:, 0]
+        source = complete(local, source['root_positions'], rig, 60)
+        params = parameters()
+        params.update(preserveReferenceHeading=True, fullBodyPhaseFractions=[.25, .5, .75])
+        constraints, receipt = materialize_gait_constraints(params, source, rig)
+        headings = np.asarray(constraints[0]['global_root_heading'])
+        self.assertGreater(np.ptp(np.arctan2(headings[:, 1], headings[:, 0])), .03)
+        for constraint in constraints[1:]:
+            for frame, (_, _, _, joints) in decode(constraint, rig).items():
+                line = joints[5] - joints[1]
+                observed = np.arctan2(line[2], -line[0])
+                expected = np.arctan2(headings[frame, 1], headings[frame, 0])
+                self.assertAlmostEqual(observed, expected, places=10)
+        np.testing.assert_allclose(headings[:60], headings[60:120], atol=1e-12)
+        params['preserveReferenceHeading'] = 'true'
+        with self.assertRaisesRegex(ValueError, 'must be a boolean'):
+            materialize_gait_constraints(params, source, rig)
+
+    def test_swing_foot_seam_orientation_is_consistent_with_fullbody_and_sparse_budget(self):
+        source,rig=walking_fixture(seconds=5.)
+        params=parameters();params.update(seconds=3.02,footBoundaryContextFrames=1,
+            boundaryContextFrames=1,constrainClipEndpoint=True,supportAnchorCount=3,
+            fullBodyPhaseFractions=[1/60,59/60],fullBodyPhaseCycles=3)
+        constraints,receipt=materialize_gait_constraints(params,source,rig)
+        body=decode(next(c for c in constraints if c['type']=='fullbody'),rig)
+        self.assertIn(59,receipt['footBoundaryFrames'])
+        for side in ('left','right'):
+            foot=rig['jointNames'].index(side.title()+'Foot')
+            poses=decode(next(c for c in constraints if c['type']==side+'-foot'),rig)
+            self.assertLess(len(poses),20)
+            for frame in receipt['footBoundaryFrames']:
+                np.testing.assert_allclose(poses[frame][2][foot],body[frame][2][foot],atol=1e-12)
+                np.testing.assert_allclose(poses[frame][3][foot],body[frame][3][foot],atol=1e-12)
+        params['footBoundaryContextFrames']=8
+        with self.assertRaisesRegex(GaitConstraintError,'frame budget'):
+            materialize_gait_constraints(params,source,rig)
+        params['footBoundaryContextFrames']=True
+        with self.assertRaisesRegex(ValueError,'Foot boundary context'):
+            materialize_gait_constraints(params,source,rig)
+
     def test_hand_endpoint_orientation_targets_repeat_with_the_body_cycle(self):
         source,rig=walking_fixture(seconds=5)
         rig=copy.deepcopy(rig)

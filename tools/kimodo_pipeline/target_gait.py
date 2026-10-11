@@ -39,8 +39,10 @@ for prefix,short,speed in (('Walk','Walk',150.),('Run','Run',350.),('Crouch_Walk
                 legacy='ALS_N_'+short+'_'+symbol+suffix
                 PILOTS[legacy]=(speed,kind);DIRECTIONS[legacy]=DIRECTIONS[native]
 PILOTS.update(A_Als_Sprint_Acceleration=(500.,'sprint_acceleration'),
-              ALS_N_Sprint_F_Impulse=(500.,'sprint_acceleration'))
+              ALS_N_Sprint_F_Impulse=(500.,'sprint_acceleration'),
+              A_Als_Run_Backward=(350.,'run_backward'), ALS_N_Run_B=(350.,'run_backward'))
 DIRECTIONS.update(A_Als_Sprint_Acceleration=(0.,1.),ALS_N_Sprint_F_Impulse=(0.,1.))
+DIRECTIONS.update(A_Als_Run_Backward=(0.,-1.),ALS_N_Run_B=(0.,-1.))
 ORIGINALS = {kind: name for name, (_, kind) in PILOTS.items() if name.startswith("A_Als_")}
 
 
@@ -230,7 +232,8 @@ def analyze_target_gait(raw, skeleton, source, protocol=None):
         # Include the segment beginning at the first stable sample. Its heel
         # can still be within the original flat-foot tolerance while crossing
         # the stricter contact-event plane before the next sample.
-        crossings = [f for f in range(start-count//2 if kind not in FORWARD_KINDS else max(0,start-count//2),start+1)
+        cyclic_event = kind not in FORWARD_KINDS or kind == 'run'
+        crossings = [f for f in range(start-count//2 if cyclic_event else max(0,start-count//2),start+1)
                      if heel[f%(count-1)] > protocol["heelContactHeightCm"] >= heel[(f+1)%(count-1)]]
         check(label+"_heel_contact_event", bool(crossings), fullSupportStart=start)
         if not crossings:

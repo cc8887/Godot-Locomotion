@@ -269,13 +269,14 @@ def prepare_target_raw(j,v4,ref,index,*,factor_root=True):
     name=target_gait.asset_name(source)
     periodic=(policy and name in target_gait.PILOTS and
               target_gait.PILOTS[name][1]!='sprint_acceleration' and
-              target_gait.original_protocol()['assets'][target_gait.PILOTS[name][1]]['contactMode']=='flat_sole')
+              target_gait.original_protocol()['assets'][target_gait.PILOTS[name][1]]['contactMode'] in ('flat_sole','toe'))
     if periodic:
         validate_gait_receipt(j)
         from .target_cleanup import repair_periodic_gait
         j['_targetPhaseInputRaw']=copy.deepcopy(result)
         try:
-            result,phase,cleanup_report=repair_periodic_gait(result,skel,source)
+            result,phase,cleanup_report=repair_periodic_gait(result,skel,source,
+                phase_harmonics=j['contract'].get('targetPhaseHarmonics',3))
             j['_targetPhaseReport']=phase;j['_targetCleanupReport']=cleanup_report
             j['_targetPhaseRepairedRaw']=copy.deepcopy(result)
         except ValueError as error:

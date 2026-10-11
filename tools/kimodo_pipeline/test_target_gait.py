@@ -9,6 +9,23 @@ from .target_gait import (analyze_target_gait, original_protocol,
 
 
 class TargetGaitTests(unittest.TestCase):
+    def test_running_cycle_detects_a_real_landing_across_its_pose_seam(self):
+        row,native=self.original('run')
+        raw=copy.deepcopy(row['raw'])
+        period=raw['sampledKeyCount']-1
+        shift=int(np.flatnonzero(native['contacts'][0])[0])
+        indices=(np.arange(period+1)+shift)%period
+        for track in raw['tracks']:
+            for field in ('positions','rotations','scales'):
+                if len(track[field])==period+1:track[field]=np.asarray(track[field])[indices].tolist()
+        checked=analyze_target_gait(raw,row.get('skeleton',self.protocol['skeleton']),row['source'])
+        self.assertTrue(checked['passed'],[c for c in checked['checks'] if not c['passed']])
+        self.assertEqual(0,next(e for e in checked['events'] if e['side']=='left')['stableStart'])
+        damaged=copy.deepcopy(raw)
+        pelvis=next(t for t in damaged['tracks'] if t['bone'].lower()=='pelvis')
+        for position in pelvis['positions']:position[2]+=10
+        self.assertFalse(analyze_target_gait(damaged,row.get('skeleton',self.protocol['skeleton']),row['source'])['passed'])
+
     def test_native_directional_and_impulse_geometry_contracts(self):
         for kind in self.protocol['assets']:
             with self.subTest(kind=kind):
