@@ -30,6 +30,8 @@ Kimodo `left-hand/right-hand` 条件同时包含 FK 后的全局位置和旋转�
 
 `target-mantle/<source sha256>/` 保存作者证书、目标质量、修复前后 raw、接触曲线；质量报告绑定最终 raw 的语义摘要。诊断包可以继续 FBX 导出和运行检查并记录失败；正常 stage 与正式启用必须通过完整逐资产 Mantle 门禁，正式启用还验证报告文件摘要和最终 raw 身份。
 
+目标骨架的完整形变还要求正确驱动实际加权的 twist 分支，不能以手端点朝向正确替代。旧 v1 纯脚本角度转换只继承未映射骨的父骨运动，局部 twist 恒定，缺口已由[最终 FBX 复核](../verification/2026-10-12-mantle-resource-suitability.md)确认。独立 Pipeline 的 v2 已按不可变骨段轴重建八个叶子 twist：近端抵消主骨一半轴向旋转，远端分担手／足一半轴向旋转；逐键 unwrap 后烘焙，接触修复也使用同一蒙皮姿态，Root 分解后复算并登记逐资产 twist 门禁。运行 Core 对 Mantle 手 IK 和换模 IK 新增的轴向旋转做增量补偿，保留既有作者分布。六个 Mantle 候选已重出，主骨、指节、Root 与其他 155 个交付姿势保持；默认旧包尚未切换，其烘焙轨道仍是旧版。算法与验证见[twist 重建记录](../verification/2026-10-12-mantle-twist-reconstruction.md)。半比例不等于原版动画等价或完整关节形变验收；0 轴向运动允许 0 twist，完全伸肘与腕部摆转仍需单独处理。
+
 High 的目标 Mannequin 左手 wrist 在原版标记上方固定偏移 1 cm，使不可由指节独立移动的拇指根部获得顶面空间。该偏移计入上述 10 cm 修复预算，并继续对未偏移原版参考检查 2 cm 位置误差；烘焙运行锚点使用同一固定偏移。它只属于该目标网格的适配，不改变 SOMA 生成条件、骨长或 Root/Pelvis 轨迹。
 
 ## Root/Pelvis 与曲线

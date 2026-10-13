@@ -434,8 +434,18 @@ public partial class AlsCharacterMotor : CharacterBody3D
             ? _restoredGroundedBeforeMove
             : IsOnFloor() || (_lastFrameId < 0 && ProbeInitialFloor());
         _hasRestoredGroundedState = false;
+        var wasMantling = _mantling.Frame.Active;
         var isMantling = StepMantling(groundedBeforeMove, resolvedCommand, command.RequestedOverlay,
             GetUpInputBlocked || isRolling || hasRootMotion || standingRequestBlocked, command.CancelAction, actionRequest, deltaTime);
+        if (wasMantling && !isMantling && MantleProgressControl && !_mantling.Frame.Interrupted)
+        {
+            // StepMantling completed the target and released its travel velocity.
+            // Feed that velocity to this frame's ordinary movement integration,
+            // which otherwise retains the pre-step custom-source velocity.
+            currentHorizontal = new(Velocity.X, 0, Velocity.Z);
+            horizontalVelocity = currentHorizontal;
+            verticalVelocity = Velocity.Y;
+        }
         if (isMantling) resolvedCommand = resolvedCommand with { JumpPressed = 0 };
         if (groundedBeforeMove && !isMantling)
         {

@@ -1,5 +1,21 @@
 # 文档导航与维护
 
+- [Mantle 修复主干集成](verification/2026-10-13-mantle-main-integration.md)：两个仓库的提交范围、精确提交源码回归、当前活动资源与本机复现边界。
+
+- [攀爬修复加入当前活动包](verification/2026-10-13-mantle-active-pack.md)：保留蹲停修复的合成包、默认启用及独立运行验证。
+
+- [Mantle 通用风格制作与接触适配](verification/2026-10-13-mantle-style-generalization.md)：门禁合理性、提示词模块、源／目标反馈与当前实际验证；[制作方法与命令](../../Kimodo-Pipeline/docs/architecture/mantle-style-generalization.md)。
+
+- [ALS 角色模型绑定](architecture/als-character-model-binding.md)与[女角色制作和普通 Demo 闭环接入](verification/2026-10-11-girl-als-model-import.md)：实际补骨/扭转权重、保留体型比例的骨骼重定向、同一角色事务与足底几何、M 键游戏内模型切换；[换模工具链](../tools/models/README.md)、[问题积累](../tools/models/troubleshooting.md)和[工具验证](verification/2026-10-12-character-model-toolkit.md)提供检查/制作/回读/游戏统一入口。完整人工权重与动作矩阵仍开放。
+
+- [Mantle Root、显示模型接触与落点交接修复](verification/2026-10-12-mantle-root-model-contact.md)：当前包的实际双模型、Root 开／关、高度／移动平台／中断、单并行与渲染矩阵，完整骨架故障回滚，以及原版指节和身体释放的开放问题。
+
+- [Mantle 实体 twist 重建](verification/2026-10-12-mantle-twist-reconstruction.md)：八骨生产烘焙、IK 增量补偿、六身份重出与 FBX 回读、真实双模型骨骼／蒙皮／回滚和保留的姿态、负对照及生产边界。
+
+- [1.5 m 女角色持续支撑时的腕部扭曲](verification/2026-10-12-mantle-high-wrist-twist-diagnosis.md)：同帧驱动／显示肘弯、腕部局部姿态与实体 twist 读回，定位全长可达及旋转分配缺口；仅诊断，修复与形变验收仍开放。
+
+- [Mantle 交付资源适用性复核](verification/2026-10-12-mantle-resource-suitability.md)：原版／生成修复前后／最终 FBX 证实生产端 twist 重建遗漏，区分片段缺口与运行时完全伸肘；当前默认女角色的生产质量仍不合格。
+
 ## 从哪里开始
 
 - [Sprint 单周期接入](verification/2026-10-13-sprint-loop-integration.md)：联合接缝／支撑修复、真实模型门禁、最新活动资产保持和普通游戏默认资源；[制作方法](../../Kimodo-Pipeline/docs/architecture/kimodo-single-loop-crop.md)。

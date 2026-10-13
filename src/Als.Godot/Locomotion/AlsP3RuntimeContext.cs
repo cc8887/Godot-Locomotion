@@ -462,6 +462,7 @@ public sealed class AlsP3RuntimeContext
         PropProfile = source.PropProfile; PropSources = source.PropSources;
         MainManagedThreadId = source.MainManagedThreadId; HeadlessOrDebug = source.HeadlessOrDebug;
         AutomaticRagdollEnvironment = source.AutomaticRagdollEnvironment;
+        CharacterModelScenePath = source.CharacterModelScenePath;
     }
 
     public AlsLocomotionSettings Settings { get; }
@@ -475,6 +476,7 @@ public sealed class AlsP3RuntimeContext
     internal AlsMovementGraphDefinition? MovementGraph { get; }
     internal AlsOverlayPropProfile? PropProfile { get; }
     internal AlsRawAnimationSourceBank? PropSources { get; }
+    internal string? CharacterModelScenePath { get; set; }
 
     public event Action<AlsFrameIdentity, AlsAnimationEvent>? AnimationEventCommitted;
     public event Action<AlsFrameIdentity, AlsActionOutcome>? ActionOutcomeCommitted;

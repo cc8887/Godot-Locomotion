@@ -13,7 +13,12 @@ public readonly record struct AlsMantlingWarpSettings(float Duration, float Mont
 
 // Start/Target have unit scale, as the native source stores only location and rotation.
 // Relative space is selected by the host's actual movement-base policy each frame.
-public readonly record struct AlsMantlingWarpAnchors(AlsPrecisePose Start, AlsPrecisePose Target);
+public readonly record struct AlsMantlingWarpAnchors(AlsPrecisePose Start, AlsPrecisePose Target)
+{
+    public bool HasActorEndpoints { get; init; }
+    public AlsPrecisePose ActorStart { get; init; }
+    public AlsPrecisePose ActorTarget { get; init; }
+}
 
 public readonly record struct AlsMantlingRootMotionStep(float Time, bool HasRootMotion, float MontageTime,
     float MontagePosition, float LocationWeight, float RotationWeight, AlsPrecisePose TargetActor,
@@ -39,7 +44,12 @@ public static class AlsMantlingRootMotion
         }
         var end = AlsPrecisePose.Compose(Reverse(UnitScale(lastRoot),mesh),worldTarget);
         if (relative) end = AlsPrecisePose.Relative(end,targetBase);
-        return new(UnitScale(start),UnitScale(end));
+        return new(UnitScale(start),UnitScale(end))
+        {
+            HasActorEndpoints=true,
+            ActorStart=relative ? UnitScale(AlsPrecisePose.Relative(actor,targetBase)) : UnitScale(actor),
+            ActorTarget=relative ? UnitScale(AlsPrecisePose.Relative(worldTarget,targetBase)) : worldTarget
+        };
     }
 
     public static AlsMantlingRootMotionStep Prepare(float time, float simulationDelta, float delta,
@@ -96,6 +106,28 @@ public static class AlsMantlingRootMotion
         // disabled. Always cancel that basis before emitting an actor pose.
         var root=Reverse(mesh,useRootMotion ? UnitScale(rootSampler.Sample(montageTime)) : AlsPrecisePose.Identity);
         var targetActor=AlsPrecisePose.Compose(root,new(position,rotation,AlsDoubleVector.One));
+        if (useRootMotion && progress is not null)
+        {
+            // Contact progress describes actor travel, whereas native anchors
+            // have the authored root removed. Use the retained actor endpoints
+            // when applying clearance/lift; applying progress directly to the
+            // native anchor displacement would consume the authored travel twice.
+            if (!anchors.HasActorEndpoints) throw new ArgumentException("Contact progress requires explicit actor endpoints.");
+            var firstActor=anchors.ActorStart;var lastActor=anchors.ActorTarget;
+            firstActor.Validate();lastActor.Validate();
+            if(relative)
+            {
+                firstActor=UnitScale(AlsPrecisePose.Compose(firstActor,targetBase));
+                lastActor=UnitScale(AlsPrecisePose.Compose(lastActor,targetBase));
+            }
+            var travel=lastActor.Position-firstActor.Position;
+            var vertical=gravityUp*AlsDoubleVector.Dot(gravityUp,travel);
+            var sample=progress.Sample(montageTime,settings.MontageStartTime,
+                settings.ProgressLiftStartTime ?? settings.MontageStartTime,
+                settings.ProgressTargetHeight,settings.ProgressPreparationEndTime);
+            locationWeight=blend*sample.Planar;
+            targetActor=targetActor with {Position=firstActor.Position+(travel-vertical)*locationWeight+vertical*(blend*sample.Lift)};
+        }
         var velocity=(targetActor.Position-actor.Position)*(1.0/delta);
         var rotationDelta=targetActor.Rotation*actor.Rotation.Conjugate();
         if (!velocity.IsFinite) throw new ArgumentException("Mantle velocity overflow.");

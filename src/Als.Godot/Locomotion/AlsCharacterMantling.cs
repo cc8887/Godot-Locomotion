@@ -32,6 +32,8 @@ public partial class AlsCharacterMotor
     internal string MantleProbeRejection => _mantleProbe?.Rejection ?? "Disabled";
     private Transform3D MantleDestination => _mantling.Relative && GodotObject.IsInstanceValid(_mantling.Target)
         ? _mantling.Target!.GlobalTransform * _mantling.Destination : _mantling.Destination;
+    internal bool HasMantlingDestination => _mantling.Motion is not null && GodotObject.IsInstanceValid(_mantling.Target);
+    internal Vector3 MantlingDestinationPosition => MantleDestination.Origin;
     internal void CancelMantling() { _mantling = default; MantleTargetDestroyed = false; }
     // Native mannequin base rotation offset (mesh faces +Y, actor faces +X).
     private static readonly AlsQuaternion MantleMeshRotation = new(0, 0, -Math.Sqrt(.5), Math.Sqrt(.5));
@@ -49,6 +51,16 @@ public partial class AlsCharacterMotor
             var interrupted = !exists || blocked || cancel || request.Command != AlsActionCommand.None;
             if (interrupted || MantlingEndedByAnimation || state.Frame.Time >= state.Settings.Duration)
             {
+                if (!interrupted && MantleProgressControl)
+                {
+                    // The montage can finish one physics step before progress
+                    // reaches its endpoint. Complete the same platform-relative
+                    // target and release the custom source's travel velocity.
+                    var completed = MantleDestination;
+                    completed.Basis = completed.Basis.ScaledLocal(state.ActorScale);
+                    GlobalTransform = completed;
+                    Velocity = Vector3.Zero;
+                }
                 MantleTargetDestroyed = !exists;
                 _mantling = state with { Frame = state.Frame with { Active = false, Started = false, Interrupted = interrupted }, PreventAutoRestart = cancel };
                 return false;
@@ -78,7 +90,7 @@ public partial class AlsCharacterMotor
         var motion = _mantleResources!.Motion.Select(target.Type, overlay);
         var montage = _mantleResources.Montages.Definitions[motion.Settings.Montage];
         var pose = _mantleResources.Montages.Poses[montage.SequencePath];
-        var settings = !AlsAnimationRuntimeOptions.SampleRootMotion && MantleProgressControl
+        var settings = MantleProgressControl
             ? motion.CreateProgressSettings(target.Height)
             : motion.CreateWarpSettings(target.Height, (double)pose.Data.FrameRateNumerator / pose.Data.FrameRateDenominator, AlsAnimationRuntimeOptions.SampleRootMotion);
         var targetBase = NativeActor(target.Body.GlobalTransform);

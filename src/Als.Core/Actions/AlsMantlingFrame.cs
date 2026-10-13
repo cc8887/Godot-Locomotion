@@ -19,10 +19,15 @@ public readonly record struct AlsMantlingFrame(bool Active, bool Started, bool I
             !float.IsFinite(Height) || Height <= 0 || Type is < AlsMantlingType.High or > AlsMantlingType.InAir))
             throw new ArgumentException("Invalid mantle physics snapshot.");
     }
-    public float PositionBeforeAdvance(float delta)
+    public float PositionBeforeAdvance(float delta, float montagePlayRate = 1)
     {
         Validate();
-        if (!Active || !float.IsFinite(delta) || delta < 0) throw new ArgumentException("Invalid mantle advancement.");
-        return MathF.Max(0, StartTime + (Time + delta) * Rate - delta);
+        if (!Active || !float.IsFinite(delta) || delta < 0 ||
+            !float.IsFinite(montagePlayRate) || montagePlayRate <= 0)
+            throw new ArgumentException("Invalid mantle advancement.");
+        // The bank advances by its effective play rate, including asset RateScale.
+        // Subtract exactly that step so its ordinary Advance lands on the
+        // physical owner's time even when the asset and action rates differ.
+        return MathF.Max(0, StartTime + (Time + delta) * Rate - delta * montagePlayRate);
     }
 }

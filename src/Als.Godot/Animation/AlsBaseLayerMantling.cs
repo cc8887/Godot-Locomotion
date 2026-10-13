@@ -19,6 +19,31 @@ internal sealed partial class AlsBaseLayerFrameRuntime
     private bool _locomotionUpdated;
     private bool _committedMantleEnded, _candidateMantleEnded;
 
+    internal void GetMantleContactPreparation(in AlsPrecisePose componentWorld,
+        out AlsRetargetContactPreparation left, out AlsRetargetContactPreparation right)
+    {
+        left = right = default;
+        if (!_candidateMantling.Active || !_candidateMantling.HasContactBase ||
+            _mantleContactCurves is null || _cancelForRuntimeFailure) return;
+        foreach (var entry in _montages.Frame.Evaluations)
+        {
+            if (entry.InstanceId != _candidateMantleInstance || entry.Slot != AlsMontageSlot.PostLocomotion ||
+                entry.Weight <= AlsPoseBlender.WeightThreshold) continue;
+            var curve = _mantleContactCurves[entry.ActionDefinitionId];
+            left = Preparation(curve, true, entry.Position, _candidateMantling.Rate, _candidateMantling.ContactBase, componentWorld);
+            right = Preparation(curve, false, entry.Position, _candidateMantling.Rate, _candidateMantling.ContactBase, componentWorld);
+            return;
+        }
+    }
+
+    private static AlsRetargetContactPreparation Preparation(AlsMantlingContactCurve curve, bool left,
+        float time, float rate, in AlsPrecisePose ledgeWorld, in AlsPrecisePose componentWorld)
+    {
+        if (!curve.TryGetAcquisitionWindow(time, left, out var window)) return default;
+        var weight = AlsMantlingContactCurve.PreparationWeight(window, time, rate, .2f);
+        return new(true, AlsPrecisePose.Relative(AlsPrecisePose.Compose(window.LedgeAnchor, ledgeWorld), componentWorld), weight);
+    }
+
     internal bool TryMantleContacts(out AlsMantlingHandContact left,out AlsMantlingHandContact right,
         out AlsPrecisePose ledge,out float weight,out float sampleTime)
     {
@@ -53,7 +78,8 @@ internal sealed partial class AlsBaseLayerFrameRuntime
         if (_committedMantling.Active && !ragdoll && _committedMantleInstance > 0)
             foreach (var instance in _montages.Committed)
                 if (instance.InstanceId == _committedMantleInstance && instance.Playing && !instance.Interrupted)
-                    seek = new(instance.InstanceId, MathF.Min(instance.Duration, _committedMantling.PositionBeforeAdvance(delta)));
+                    seek = new(instance.InstanceId, MathF.Min(instance.Duration,
+                        _committedMantling.PositionBeforeAdvance(delta, instance.EffectivePlayRate)));
         _actions.Begin(identity, delta, ragdoll, seek);
         _candidateMantleEnded = _committedMantling.Active && _mantleBranches?.CandidateAction != "Als.LocomotionAction.Mantling";
     }
@@ -80,6 +106,7 @@ internal sealed partial class AlsBaseLayerFrameRuntime
     private void ApplyMantleCurveAliases()
     {
         if (_montages.SlotWeights(AlsMontageSlot.PostLocomotion).SlotNodeWeight <= AlsPoseBlender.WeightThreshold) return;
+        AlsRefactoredV4ViewMask.Apply(CurveNames, _rawCurves);
         Copy("PoseStanding", "BasePose_N"); Copy("PoseCrouching", "BasePose_CLF");
         Copy("FootLeftIk", "Enable_FootIK_L"); Copy("FootRightIk", "Enable_FootIK_R");
         Copy("FootLeftLock", "FootLock_L"); Copy("FootRightLock", "FootLock_R");

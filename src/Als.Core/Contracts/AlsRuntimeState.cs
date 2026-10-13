@@ -119,6 +119,8 @@ public struct AlsRuntimeState
     public AlsFootLockState LeftFootLock;
     public AlsFootLockState RightFootLock;
     public AlsPelvisCorrectionState PelvisCorrection;
+    // Model contact adaptation participates in this same candidate/rollback value.
+    public GodotAls.Core.Locomotion.AlsRetargetContactState ModelContactState;
     // Last committed uncorrected probe origins in character-local space.
     public Vector3 LeftFootProbeOrigin;
     public Vector3 RightFootProbeOrigin;
@@ -149,6 +151,7 @@ public struct AlsRuntimeState
             state.LeftFootLock != AlsFootLockState.CreateDefault() ||
             state.RightFootLock != AlsFootLockState.CreateDefault() ||
             state.PelvisCorrection != default ||
+            state.ModelContactState != default ||
             state.LeftFootProbeOrigin != Vector3.Zero ||
             state.RightFootProbeOrigin != Vector3.Zero)
         {

@@ -21,6 +21,20 @@ internal sealed class AlsSoleGeometryObserver
     public int RightCount { get; }
     public float BindErrorMeters { get; }
 
+    // Model adaptation uses the same complete, bind-validated support vertices
+    // as contact evaluation. The ankle's projection onto its reference sole
+    // plane supplies a rotation-covariant contact marker, in bone-local meters.
+    internal Vector3 ReferenceContactMarker(Skeleton3D skeleton, bool left)
+    {
+        RequireMainThread();
+        var rest = Enumerable.Range(0, skeleton.GetBoneCount()).Select(skeleton.GetBoneGlobalRest).ToArray();
+        var points = _supportPoints.Where(p => p.Left == left && p.Surface.Skeleton == skeleton).ToArray();
+        if (points.Length == 0) throw new InvalidOperationException("Reference contact marker has no support geometry.");
+        var minimum = points.Min(p => Skin(p.Surface, p.Vertex, rest).Z);
+        var ankle = rest[skeleton.FindBone(left ? "foot_l" : "foot_r")];
+        return ankle.AffineInverse() * new Vector3(ankle.Origin.X, ankle.Origin.Y, minimum);
+    }
+
     // Measure the already-published skeleton, independently of the Rig's
     // desired contacts. The complete support mesh determines penetration.
     internal (AlsFootQualitySample Left, AlsFootQualitySample Right) CaptureQuality(
@@ -55,16 +69,21 @@ internal sealed class AlsSoleGeometryObserver
         }
     }
 
-    public AlsSoleGeometryObserver(Node root)
+    public AlsSoleGeometryObserver(Node root, bool referenceOnly = false)
     {
         RequireMainThread();
         var candidates = new List<Point>();
         foreach (var mesh in Descendants(root).OfType<MeshInstance3D>())
         {
-            if (mesh.Mesh is not { } resource || mesh.GetSkinReference() is not { } reference) continue;
-            var skin = reference.GetSkin();
+            if (mesh.Mesh is not { } resource) continue;
+            // Model installation happens before the character joins the scene
+            // tree. Its immutable Skin is already available; runtime observation
+            // continues to require the registered SkinReference.
+            var skin = referenceOnly ? mesh.Skin : mesh.GetSkinReference()?.GetSkin();
             if (skin is null || skin.GetBindCount() == 0) continue;
             var skeleton = mesh.GetNode<Skeleton3D>(mesh.Skeleton);
+            if (referenceOnly && mesh.GetParent() != skeleton)
+                throw new InvalidOperationException("Reference marker extraction requires a directly bound mesh.");
             if (mesh.GetBlendShapeCount() != 0)
                 throw new InvalidOperationException("Sole observation does not yet evaluate mesh blend shapes.");
             var count = skin.GetBindCount(); var bones = new int[count]; var binds = new Transform3D[count];
@@ -105,8 +124,9 @@ internal sealed class AlsSoleGeometryObserver
                         total += weight;
                     }
                     if (MathF.Abs(total - 1) > .001f) throw new InvalidOperationException("Skin weights are not normalized.");
-                    var worldRest = skeleton.GlobalTransform * Skin(surface, v, rest);
-                    BindErrorMeters = MathF.Max(BindErrorMeters, worldRest.DistanceTo(mesh.GlobalTransform * vertices[v]));
+                    var worldRest = referenceOnly ? Skin(surface, v, rest) : skeleton.GlobalTransform * Skin(surface, v, rest);
+                    var referenceVertex = (referenceOnly ? mesh.Transform : mesh.GlobalTransform) * vertices[v];
+                    BindErrorMeters = MathF.Max(BindErrorMeters, worldRest.DistanceTo(referenceVertex));
                     if (left >= .99f || right >= .99f) candidates.Add(new(surface, v, left >= .99f, worldRest.Y));
                 }
             }
@@ -180,7 +200,8 @@ internal sealed class AlsSoleGeometryObserver
     // Export data once on the main thread. All >=99% foot/toe-weighted vertices
     // participate in runtime support; the diagnostic's lower 4 mm subset stays
     // independently observable and does not determine a fitted foot height.
-    public AlsFootSupportGeometry CreateSupportGeometry(ReadOnlySpan<string> logicalNames)
+    public AlsFootSupportGeometry CreateSupportGeometry(ReadOnlySpan<string> logicalNames,
+        ReadOnlySpan<int> parents = default, ReadOnlySpan<AlsPrecisePose> reference = default)
     {
         RequireMainThread();
         var map = logicalNames.ToArray().Select((name, index) => (name, index))
@@ -201,9 +222,56 @@ internal sealed class AlsSoleGeometryObserver
             }
             points.Add(new(first, influences.Count - first, point.Left));
         }
-        var geometry = new AlsFootSupportGeometry(logicalNames.Length, points.ToArray(), influences.ToArray());
+        var model = _surfaces.Select(s => s.Skeleton).Distinct().SingleOrDefault(s =>
+            s.HasMeta("als_pose_binding") && s.GetMeta("als_pose_binding").AsString() == "preserve-proportions-v1");
+        AlsSkeletonPoseRetargetModel? retarget = null;
+        if (model is not null)
+        {
+            var nativeReference = reference.ToArray();
+            for (var bone = 0; bone < nativeReference.Length; bone++)
+                nativeReference[bone] = AlsCharacterModelBinding.NativePose(nativeReference[bone]);
+            retarget = AlsCharacterModelBinding.CreateRetarget(logicalNames, parents, nativeReference, model);
+        }
+        var geometry = new AlsFootSupportGeometry(logicalNames.Length, points.ToArray(), influences.ToArray(), retarget);
         GD.Print($"ALS_FOOT_SUPPORT_GEOMETRY left={geometry.LeftCount} right={geometry.RightCount} bones={logicalNames.Length} bind_error_m={BindErrorMeters:R}");
         return geometry;
+    }
+
+    internal AlsRetargetBodyGeometry CreateBodyGeometry(ReadOnlySpan<string> logicalNames,
+        ReadOnlySpan<int> parents, int contactRoot, ReadOnlySpan<AlsRetargetLimb> ikLimbs)
+    {
+        RequireMainThread();
+        var map = logicalNames.ToArray().Select((name, index) => (name, index))
+            .ToDictionary(pair => pair.name, pair => pair.index, StringComparer.OrdinalIgnoreCase);
+        var allowed = new bool[parents.Length];
+        for (var bone = 0; bone < parents.Length; bone++)
+        {
+            allowed[bone] = bone == contactRoot || parents[bone] >= 0 && allowed[parents[bone]];
+            foreach (var limb in ikLimbs) if (bone == limb.Upper) allowed[bone] = false;
+        }
+        var points = new List<AlsRetargetBodyPoint>();
+        var influences = new List<AlsRetargetBodyInfluence>();
+        foreach (var surface in _surfaces)
+        {
+            for (var vertex = 0; vertex < surface.Vertices.Length; vertex++)
+            {
+                var first = influences.Count; var rigid = true;
+                for (var index = 0; index < surface.Stride; index++)
+                {
+                    var weight = surface.Weights[vertex * surface.Stride + index];
+                    if (weight == 0) continue;
+                    var bind = surface.Indices[vertex * surface.Stride + index];
+                    var bone = map[surface.Skeleton.GetBoneName(surface.Bones[bind]).ToString()];
+                    if (!allowed[bone]) { rigid = false; break; }
+                    var local = surface.Binds[bind] * surface.Vertices[vertex];
+                    influences.Add(new(bone, new(local.X * 100d, -local.Y * 100d, local.Z * 100d), weight));
+                }
+                if (rigid && influences.Count > first) points.Add(new(first, influences.Count - first));
+                else influences.RemoveRange(first, influences.Count - first);
+            }
+        }
+        GD.Print($"ALS_RETARGET_BODY_GEOMETRY points={points.Count} influences={influences.Count} bind_error_m={BindErrorMeters:R}");
+        return new(logicalNames.Length, points.ToArray(), influences.ToArray());
     }
 
     private static void RequireMainThread()

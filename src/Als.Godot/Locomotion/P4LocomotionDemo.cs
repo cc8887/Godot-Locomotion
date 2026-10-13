@@ -245,6 +245,7 @@ public partial class P4LocomotionDemo : Node3D
                 System.Environment.CurrentManagedThreadId,
                 headlessOrDebug: _smokeRuntimePolicy?.HeadlessOrDebug ?? (_smokeCommandSource is not null || OS.IsDebugBuild()));
             _configureSmokeContext?.Invoke(_context);
+            _context.CharacterModelScenePath = AlsCharacterModel.SelectDemoScene();
             _context.AutomaticRagdollEnvironment = GetNode<Node>("World");
             if (_smokeCommandSource is null && _context.MovementGraph is { } movementGraph)
             {

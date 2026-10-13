@@ -39,8 +39,21 @@ public partial class AlsP3WorkerRoot : Node3D
         if (!GodotThread.IsMainThread() || _state.WorkerInFlightCount != 0 || Volatile.Read(ref _disposed) != 0)
             throw new InvalidOperationException("Physical display requires an idle live visual worker.");
         _controller!.PresentRagdoll(simulation);
+        _characterModel?.Apply(false);
+        _runtimeState.ModelContactState = default;
     }
     internal Skeleton3D PhysicalDisplaySkeleton => _skeleton!;
+    internal Skeleton3D PresentationSkeleton => _characterModel?.Skeleton ?? _skeleton!;
+    internal double ModelContactResidualCm => _characterModel?.ContactResidualCm ?? 0;
+    internal double ModelContactBendLossDegrees => _characterModel?.ContactBendLossDegrees ?? 0;
+    internal AlsRetargetContactState ModelContactState => _runtimeState.ModelContactState;
+    internal double ModelBodyPenetrationCm => _characterModel?.BodyPenetrationCm ?? 0;
+    internal double ModelBodyClearanceResidualCm => _characterModel?.BodyClearanceResidualCm ?? 0;
+    internal int ModelBodyGeometryPointCount => _characterModel?.BodyGeometryPointCount ?? 0;
+    internal double ModelContactPreparationWeight => _characterModel?.PreparationWeight ?? 0;
+    internal double ModelPreparationSourceReachExcessCm => _characterModel?.PreparationSourceReachExcessCm ?? 0;
+    internal GodotAls.Core.Locomotion.AlsDoubleVector ModelContactRootCorrectionCm => _characterModel?.ContactRootCorrectionCm ?? default;
+    internal double ModelContactRootCorrectionLimitCm => _characterModel?.ContactRootCorrectionLimitCm ?? 0;
     internal Transform3D RecoverySkeletonWorld(Transform3D restoredRoot)
     {
         if (!GodotThread.IsMainThread() || _state.WorkerInFlightCount != 0 || Volatile.Read(ref _disposed) != 0)
@@ -80,6 +93,7 @@ public partial class AlsP3WorkerRoot : Node3D
     private AlsCurveSampler[] _p4CurveSamplers = [];
     private Node3D? _visualRoot;
     private Skeleton3D? _skeleton;
+    private AlsCharacterModelBinding? _characterModel;
     private int _footSkeletonBoneCount;
     private int _leftFootBoneId = -1;
     private int _rightFootBoneId = -1;
@@ -206,6 +220,7 @@ public partial class AlsP3WorkerRoot : Node3D
             }
             _visualRoot = _library.Root as Node3D
                 ?? throw new InvalidOperationException("P3 visual library root must be a Node3D.");
+            _characterModel = AlsCharacterModel.Install(_library.Root, _library.Skeleton, context.CharacterModelScenePath);
             AddChild(_library.Root);
             using (var graphTrace = AlsPerformanceTrace.Begin("worker.graph_and_controller"))
             {
@@ -244,6 +259,7 @@ public partial class AlsP3WorkerRoot : Node3D
                 movementTrace?.Complete();
             }
             _skeleton = _graph.TargetSkeleton;
+            _characterModel?.Apply();
             if (context.PropProfile is not null) _props = new(context.PropProfile, context.PropSources!, context.AnimationSet);
             ConfigureFootProbeSource(context.AnimationSet, _poseProfile);
             var correctedRoot = AlsP3Presentation.Compose(
@@ -688,6 +704,14 @@ public partial class AlsP3WorkerRoot : Node3D
                 candidateResult.P4ModifierOperationTicks = modifierOutput.OperationTicks;
                 candidateResult.P4ReasonCode = AlsP4ReasonCode.None;
                 AdvanceWorkerStage(ref workerStageSequence, 0x12345u, 6u);
+                if (_characterModel is not null)
+                    _characterModel.ApplyContactFrame(runtimeCheckpoint.ModelContactState, input.DeltaTime,
+                        input.Mantling.Interrupted || input.Mantling.Started ||
+                        _state.AnimationRecovery.RequiresCancellation(identity) ||
+                        !input.Mantling.Active && input.Mantling.Time == 0,
+                        out candidateRuntimeState.ModelContactState, _controller.PendingMantleContacts, input.Mantling,
+                        _controller.PendingMantlePreparation);
+                else candidateRuntimeState.ModelContactState = default;
                 var appliedRoot = _visualRoot.GlobalTransform;
                 AlsP3Presentation.ThrowIfNonFinite(appliedRoot);
                 if (measure)
@@ -858,7 +882,8 @@ public partial class AlsP3WorkerRoot : Node3D
                             restoredFullPoseDigest,
                             restoredRootDigest,
                             restoredFullPoseDigest == _capturedFullPoseDigest &&
-                            restoredRootDigest == _capturedRootDigest);
+                            restoredRootDigest == _capturedRootDigest &&
+                            (_characterModel?.CapturedPoseMatches() ?? true));
                     }
                 }
                 catch (Exception secondaryException)
@@ -971,6 +996,7 @@ public partial class AlsP3WorkerRoot : Node3D
         left.RightFootLockPoseRotation == right.RightFootLockPoseRotation &&
         left.RightFootLock == right.RightFootLock &&
         left.PelvisCorrection == right.PelvisCorrection &&
+        left.ModelContactState == right.ModelContactState &&
         left.LeftFootProbeOrigin == right.LeftFootProbeOrigin &&
         left.RightFootProbeOrigin == right.RightFootProbeOrigin;
 
@@ -995,6 +1021,7 @@ public partial class AlsP3WorkerRoot : Node3D
         _graph = null;
         _library?.Dispose();
         _library = null;
+        _characterModel = null;
         _visualRoot = null;
         _skeleton = null;
         _footSkeletonBoneCount = 0;
@@ -1291,6 +1318,7 @@ public partial class AlsP3WorkerRoot : Node3D
 
     private void CapturePose()
     {
+        _characterModel?.CapturePose();
         _capturedRootTransform = _visualRoot!.GlobalTransform;
         for (var index = 0; index < _posePositions.Length; index++)
         {
@@ -1597,6 +1625,7 @@ public partial class AlsP3WorkerRoot : Node3D
             _skeleton.SetBonePoseRotation(index, _poseRotations[index]);
             _skeleton.SetBonePoseScale(index, _poseScales[index]);
         }
+        _characterModel?.RestoreCapturedPose();
     }
 
     private ulong ComputeFullPoseDigest()

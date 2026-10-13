@@ -39,7 +39,7 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
                 args.Contains("--mantle-single") ? AlsHarnessMode.Single : AlsHarnessMode.Parallel, true) };
             AddChild(_entry);
             if (!_entry.Demo.IsRuntimeReady) throw new Exception("Demo failed to initialize.");
-            if (_output is not null) _geometry=new(_entry.Demo.ActiveCharacter.PhysicalDisplaySkeleton.GetParent());
+            if (_output is not null) _geometry=new(_entry.Demo.ActiveCharacter.PresentationSkeleton.GetParent());
             var world = _entry.Demo.GetNode<Node3D>("World");
             foreach (var child in world.GetChildren()) if (child.Name != "StartFloor") Disable(child);
             var floor = world.GetNode<StaticBody3D>("StartFloor");
@@ -101,15 +101,9 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
             _last = motor.GlobalPosition;
             if (_output is not null)
             {
-                var skeleton=character.PhysicalDisplaySkeleton;
-                var bones=new Dictionary<string,object>();
-                foreach (var name in new[]{"root","pelvis","spine_03","hand_l","hand_r","foot_l","foot_r"})
-                {
-                    var bone=skeleton.FindBone(name);var pose=skeleton.GetBoneGlobalPose(bone);
-                    var worldPose=skeleton.GlobalTransform*pose;
-                    bones[name]=new {world=V(worldPose.Origin),rotation=Q(worldPose.Basis.GetRotationQuaternion()),
-                        platformLocal=GodotObject.IsInstanceValid(_obstacle) ? V(_obstacle.GlobalTransform.AffineInverse()*worldPose.Origin) : V(worldPose.Origin)};
-                }
+                var skeleton=character.PresentationSkeleton;
+                var bones=CaptureBones(skeleton);
+                var driverBones=skeleton==character.PhysicalDisplaySkeleton ? null : CaptureBones(character.PhysicalDisplaySkeleton);
                 var penetration=GodotObject.IsInstanceValid(_obstacle) ? _geometry!.CaptureVolumePenetration(
                     _obstacle.GlobalTransform,new Aabb(new Vector3(-2,-_height/2,-1.5f),new Vector3(4,_height,3))) : default;
                 var contacts=character.FullMovementDiagnostics.MantleContacts;
@@ -123,9 +117,22 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
                         rightAnchor=Anchor(contacts.Applied ? contacts.RightWorld : GodotAls.Core.Locomotion.AlsPrecisePose.Identity)},
                     contactBase=new {position=mantle.ContactBase.Position,rotation=mantle.ContactBase.Rotation},
                     mesh=new {position=V(skeleton.GlobalPosition),rotation=Q(skeleton.GlobalBasis.GetRotationQuaternion())},
-                    active=mantle.Active,actor=V(motor.GlobalPosition),
+                    active=mantle.Active,ragdoll=character.RagdollSimulation is not null,actor=V(motor.GlobalPosition),
+                    destination=motor.HasMantlingDestination ? V(motor.MantlingDestinationPosition) : null,
+                    presentationSkeleton=skeleton.Name.ToString(),
+                    modelContactResidualCm=character.ModelContactResidualCm,
+                    modelContactBendLossDegrees=character.ModelContactBendLossDegrees,
+                    modelContactReleasing=character.ModelContactState.Releasing,
+                    modelContactReleaseElapsedSeconds=character.ModelContactState.ReleaseElapsedSeconds,
+                    modelBodyPenetrationCm=character.ModelBodyPenetrationCm,
+                    modelBodyClearanceResidualCm=character.ModelBodyClearanceResidualCm,
+                    modelBodyGeometryPointCount=character.ModelBodyGeometryPointCount,
+                    modelContactPreparationWeight=character.ModelContactPreparationWeight,
+                    modelPreparationSourceReachExcessCm=character.ModelPreparationSourceReachExcessCm,
+                    modelContactRootCorrectionCm=character.ModelContactRootCorrectionCm,
+                    modelContactRootCorrectionLimitCm=character.ModelContactRootCorrectionLimitCm,
                     actorYaw= motor.GlobalBasis.GetEuler().Y,committed=character.RuntimeCommittedFrameId,
-                    presented=character.PublishedFrameId,bones,penetration=new {penetration.Vertices,penetration.Inside,
+                    presented=character.PublishedFrameId,bones,driverBones,penetration=new {penetration.Vertices,penetration.Inside,
                         penetration.MaximumDepthMeters,deepestWorld=V(penetration.DeepestWorld),penetration.DominantBone}});
             }
             if (_tick % Math.Max(1, _hz / 10) == 0 && _capture is not null) _captures.Add(_tick);
@@ -169,6 +176,25 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
     }
     private static float[] V(Vector3 v)=>[v.X,v.Y,v.Z];
     private static float[] Q(Quaternion q)=>[q.X,q.Y,q.Z,q.W];
+    private Dictionary<string,object> CaptureBones(Skeleton3D skeleton)
+    {
+        var bones=new Dictionary<string,object>();
+        foreach (var name in new[]{"root","pelvis","spine_03","upperarm_l","lowerarm_l","hand_l",
+            "upperarm_r","lowerarm_r","hand_r","thigh_l","calf_l","foot_l","thigh_r","calf_r","foot_r",
+            "upperarm_twist_01_l","lowerarm_twist_01_l","upperarm_twist_01_r","lowerarm_twist_01_r",
+            "thigh_twist_01_l","calf_twist_01_l","thigh_twist_01_r","calf_twist_01_r"})
+        {
+            var bone=skeleton.FindBone(name);
+            if(bone<0) throw new InvalidOperationException("Missing Mantle observation bone: "+name);
+            var pose=skeleton.GlobalTransform*skeleton.GetBoneGlobalPose(bone);
+            var local=skeleton.GetBonePose(bone);var reference=skeleton.GetBoneRest(bone);
+            bones[name]=new {world=V(pose.Origin),rotation=Q(pose.Basis.GetRotationQuaternion()),
+                localRotation=Q(local.Basis.GetRotationQuaternion()),restRotation=Q(reference.Basis.GetRotationQuaternion()),
+                restPosition=V(reference.Origin),
+                platformLocal=GodotObject.IsInstanceValid(_obstacle) ? V(_obstacle.GlobalTransform.AffineInverse()*pose.Origin) : V(pose.Origin)};
+        }
+        return bones;
+    }
     private static object Anchor(GodotAls.Core.Locomotion.AlsPrecisePose p)
     {
         // The desired rotation still carries native bone axes. Final displayed
@@ -185,7 +211,7 @@ _capture = args.FirstOrDefault(a => a.StartsWith("--capture-dir="))?[14..];
             rootMotion=GodotAls.Animation.AlsAnimationRuntimeOptions.SampleRootMotion,
             progressControl=GodotAls.Animation.AlsAnimationRuntimeOptions.MantleProgressControl,
             fixtureHeightMeters=_height,
-            scope="Published physical bones and full skin vertices against the fixture box",frames=_frames}));
+            scope="Published presentation bones and full skin vertices against the fixture box",frames=_frames}));
     }
     private void Fail(Exception e) { _done = true; SaveReport(); GD.PushError(e.ToString()); GetTree().Quit(1); }
     public override void _ExitTree() { Input.ActionRelease("jump"); if (_capture is not null) RenderingServer.FramePostDraw -= Capture; }

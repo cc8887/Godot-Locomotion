@@ -128,6 +128,9 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
     private AlsLocalPose _candidateComponent;
     private bool _mantleContactEvaluated;
     private AlsMantlingContactDiagnostics _candidateMantleContacts,_committedMantleContacts;
+    internal AlsMantlingContactDiagnostics CandidateMantleContacts => _candidateMantleContacts;
+    private (AlsRetargetContactPreparation Left, AlsRetargetContactPreparation Right) _candidateMantlePreparation;
+    internal (AlsRetargetContactPreparation Left, AlsRetargetContactPreparation Right) CandidateMantlePreparation => _candidateMantlePreparation;
     private readonly Node3D _component;
     private readonly long _attachParent;
     private readonly NVector3 _animatedSpeeds;
@@ -292,7 +295,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
         if(AlsAnimationRuntimeOptions.MantleContactControl)
         {
             var contactSkeleton=definition.OverlayRawSources.GetSkeleton(pose.SkeletonId);
-            _mantleHands=new(contactSkeleton.LogicalBoneNames,contactSkeleton.LogicalParents);
+            _mantleHands=new(contactSkeleton.LogicalBoneNames,contactSkeleton.LogicalParents,contactSkeleton.PreciseReferencePose);
         }
         _committedAnimationPose = new AlsLocalPose[_logicalBoneCount];
         _leftIk = CurveNames.IndexOf(splitFeet ? "FootLeftIk" : "Enable_FootIK_L");
@@ -342,6 +345,7 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
             throw new InvalidOperationException("Non-default Overlay requires the layered animation owner.");
         _identity = input.Identity; _candidateComponent=AlsPrecisePose.Compose(_skeletonToComponent,new(componentPose)).ToSingle();
         _mantleContactEvaluated=false; _candidateMantleContacts=default;
+        _candidateMantlePreparation = default;
         _nextEvaluation = _evaluation.Next(checked((ulong)input.Identity.FrameId));
         var movement = _standing.CreateMovementInput(input);
         var rules = new AlsGroundedRuleInput(movement.ShouldMove, false, false, result.ActualStance,
@@ -410,6 +414,9 @@ internal sealed class AlsProductionMovementRuntime : IDisposable, IAlsGroundedFr
 
     private void CompleteEvaluation()
     {
+        if (_mantleHands is not null)
+            _base.GetMantleContactPreparation(AlsFootIkCoordinates.FbxComponentToNativeWorld(_candidateComponent),
+                out _candidateMantlePreparation.Left, out _candidateMantlePreparation.Right);
         if(_mantleHands is not null && _base.TryMantleContacts(out var left,out var right,out var ledge,out var weight,out var sampleTime))
         {
             _mantleHands.Evaluate(_layered is null ? _base.Pose : _layered.Pose,_mantleContactPose,

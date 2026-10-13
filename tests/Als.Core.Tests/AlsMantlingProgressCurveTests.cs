@@ -7,6 +7,41 @@ public sealed class AlsMantlingProgressCurveTests
 {
     private static AlsMantlingProgressCurve Curve()=>new([0,.25f,.5f,1],[0,5,20,100],[0,40,80,100]);
 
+    [Theory]
+    [InlineData(0f, false, 1f)][InlineData(.25f, false, 1f)]
+    [InlineData(0f, true, 1f)][InlineData(.25f, true, 1f)]
+    [InlineData(0f, false, 2f)][InlineData(.25f, false, 2f)]
+    [InlineData(0f, true, 2f)][InlineData(.25f, true, 2f)]
+    public void SampledRootContactTravelUsesActorEndpointsAndMatchesTheControlledRootOffPath(float entry, bool relative, float rate)
+    {
+        var mesh=new AlsQuaternion(0,0,-System.Math.Sqrt(.5),System.Math.Sqrt(.5));
+        var basis=AlsPrecisePose.Identity with {Position=new(25,-10,0),
+            Rotation=new(0,0,System.Math.Sin(.15),System.Math.Cos(.15))};
+        var actor=AlsPrecisePose.Identity with {Position=new(10,15,30)};
+        var target=actor with {Position=new(100,-20,120)};
+        var destination=relative ? AlsPrecisePose.Relative(target,basis) : target;
+        var data=new AlsRawAnimationPoseData(new(0,"root","/test",0),1,1,3,2,
+            AlsRawAnimationInterpolation.Linear,[0],[],[true],
+            [new(new(0,0,10),System.Numerics.Quaternion.Identity,System.Numerics.Vector3.One),
+             new(new(0,20,100),System.Numerics.Quaternion.Identity,System.Numerics.Vector3.One),
+             new(new(0,30,150),System.Numerics.Quaternion.Identity,System.Numerics.Vector3.One)],[]);
+        var roots=new AlsMontageRootTransformSampler([new(0,0,rate,1,rate,1,new(data,AlsPrecisePose.Identity,false))]);
+        var on=AlsMantlingRootMotion.CreateAnchors(actor,destination,mesh,roots.Sample(entry),roots.Sample(1),relative,basis);
+        var off=AlsMantlingRootMotion.CreateAnchors(actor,destination,mesh,AlsPrecisePose.Identity,AlsPrecisePose.Identity,relative,basis);
+        var settings=new AlsMantlingWarpSettings(1-entry,entry,1,0,AlsActionBlendOption.Linear,0,1,
+            AlsActionBlendOption.Linear,AlsActionBlendOption.Linear);
+        var moved=basis with {Position=basis.Position+new AlsDoubleVector(3,7,0)};
+        var enabled=AlsMantlingRootMotion.Prepare(0,.5f-entry,.1f,settings,on,actor,mesh,new(0,0,1),true,relative,moved,roots,true,Curve());
+        var disabled=AlsMantlingRootMotion.Prepare(0,.5f-entry,.1f,settings,off,actor,mesh,new(0,0,1),true,relative,moved,null!,false,Curve());
+        Assert.Equal(.5f,enabled.MontageTime);
+        Assert.Equal(disabled.Time,enabled.Time);
+        Assert.InRange((enabled.TargetActor.Position-disabled.TargetActor.Position).LengthSquared,0,1e-18);
+        Assert.InRange((enabled.Velocity-disabled.Velocity).LengthSquared,0,1e-14);
+        var end=AlsMantlingRootMotion.Prepare(0,1-entry,.1f,settings,on,actor,mesh,new(0,0,1),true,relative,moved,roots,true,Curve());
+        var expected=relative ? AlsPrecisePose.Compose(AlsPrecisePose.Relative(target,basis),moved) : target;
+        Assert.InRange((end.TargetActor.Position-expected.Position).LengthSquared,0,1e-18);
+    }
+
     [Fact]
     public void TallerLedgeFinishesSurplusLiftBeforeGripWithoutChangingTheLandingOrClock()
     {

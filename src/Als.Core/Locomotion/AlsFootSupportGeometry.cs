@@ -5,17 +5,23 @@ public readonly record struct AlsFootSupportPoint(int FirstInfluence, int Influe
 
 // Immutable imported mesh data. Positions are native bone-local centimeters;
 // runtime skinning uses the current complete component pose, including toes.
+// An optional retarget owns reusable scratch for one frame owner, not concurrent callers.
 public sealed class AlsFootSupportGeometry
 {
     private readonly AlsFootSupportInfluence[] _influences;
     private readonly AlsFootSupportPoint[] _points;
     private readonly int _boneCount;
+    private readonly AlsSkeletonPoseRetargetModel? _retarget;
+    private readonly AlsPrecisePose[] _retargeted;
     public int LeftCount { get; }
     public int RightCount { get; }
     public AlsFootSupportGeometry(int boneCount, ReadOnlySpan<AlsFootSupportPoint> points,
-        ReadOnlySpan<AlsFootSupportInfluence> influences)
+        ReadOnlySpan<AlsFootSupportInfluence> influences, AlsSkeletonPoseRetargetModel? retarget = null)
     {
         _boneCount = boneCount; _points = points.ToArray(); _influences = influences.ToArray();
+        if (retarget is not null && retarget.BoneCount != boneCount)
+            throw new ArgumentException("Foot support retarget layout differs.");
+        _retarget = retarget; _retargeted = retarget is null ? [] : new AlsPrecisePose[boneCount];
         if (boneCount <= 0 || points.Length == 0) throw new ArgumentException("Empty foot support geometry.");
         foreach (var point in points)
         {
@@ -45,6 +51,11 @@ public sealed class AlsFootSupportGeometry
         toWorld.Validate();
         if (toWorld.Scale.X <= 0 || toWorld.Scale.Y <= 0 || toWorld.Scale.Z <= 0)
             throw new ArgumentException("Support geometry requires a positive component scale.");
+        if (_retarget is not null)
+        {
+            _retarget.EvaluateComponents(components, _retargeted);
+            components = _retargeted;
+        }
         var minimum = double.PositiveInfinity;
         foreach (var point in _points)
         {

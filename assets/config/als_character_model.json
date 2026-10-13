@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "defaultModel": "girl",
+  "models": {
+    "girl": "res://assets/models/als_girl/girl_high_als_retarget.tscn"
+  }
+}

@@ -119,6 +119,17 @@ public partial class AlsP3Character : Node3D
     internal void FollowRagdollPelvis() => _motor.FollowRagdoll(RagdollSimulation!.PelvisPosition);
     internal void PresentRagdoll() => _worker.PresentRagdoll(RagdollSimulation!);
     internal Skeleton3D PhysicalDisplaySkeleton => _worker.PhysicalDisplaySkeleton;
+    internal double ModelContactResidualCm => _worker.ModelContactResidualCm;
+    internal double ModelContactBendLossDegrees => _worker.ModelContactBendLossDegrees;
+    internal GodotAls.Core.Locomotion.AlsRetargetContactState ModelContactState => _worker.ModelContactState;
+    internal double ModelBodyPenetrationCm => _worker.ModelBodyPenetrationCm;
+    internal double ModelBodyClearanceResidualCm => _worker.ModelBodyClearanceResidualCm;
+    internal int ModelBodyGeometryPointCount => _worker.ModelBodyGeometryPointCount;
+    internal double ModelContactPreparationWeight => _worker.ModelContactPreparationWeight;
+    internal double ModelPreparationSourceReachExcessCm => _worker.ModelPreparationSourceReachExcessCm;
+    internal GodotAls.Core.Locomotion.AlsDoubleVector ModelContactRootCorrectionCm => _worker.ModelContactRootCorrectionCm;
+    internal double ModelContactRootCorrectionLimitCm => _worker.ModelContactRootCorrectionLimitCm;
+    internal Skeleton3D PresentationSkeleton => _worker.PresentationSkeleton;
     internal bool BodyHistoryActive => _configured && Volatile.Read(ref _disposed) == 0 &&
         Volatile.Read(ref _state.Active) != 0 && Volatile.Read(ref _state.VisualReady) != 0;
     private AlsFrameInput _stagedReplacementMotorInput;

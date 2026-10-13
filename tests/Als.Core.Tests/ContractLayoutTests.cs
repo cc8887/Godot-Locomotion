@@ -150,7 +150,7 @@ public sealed class ContractLayoutTests
             "GroundedEntrySpeed", "SmoothedLocalVelocity", "SmoothedLocalAcceleration",
             "SmoothedLean", "LandingRecoveryTime", "SmoothedTargetYaw", "TargetYaw",
             "YawSource", "JumpStartActive", "Initialized", "ViewPose", "TurnInPlace", "RotateInPlace",
-            "LeftFootLock", "RightFootLock", "PelvisCorrection", "LeftFootProbeOrigin",
+            "LeftFootLock", "RightFootLock", "PelvisCorrection", "ModelContactState", "LeftFootProbeOrigin",
             "RightFootProbeOrigin", "ActionPlayer", "DynamicTransition", "ActionBlendLane",
             "DynamicTransitionBlendLane", "LeftFootLockPoseRotation", "RightFootLockPoseRotation");
         AssertStorageFieldOrder<AlsFrameResult>(

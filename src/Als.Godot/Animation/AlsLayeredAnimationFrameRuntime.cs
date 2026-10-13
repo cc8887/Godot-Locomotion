@@ -166,7 +166,8 @@ internal sealed class AlsLayeredAnimationFrameRuntime : IDisposable, IAlsSharedS
                         AlsBasedFootLockSettings.Default with { BaseRotationMode = baseRotationMode, PinFinalContact = pinFinalContact,
                             CorrectUnplantedPenetration = correctUnplantedPenetration, PinContactToes = pinContactToes },
                         pinFinalContact ? new GodotAls.Locomotion.AlsSoleGeometryObserver(library.Root)
-                            .CreateSupportGeometry(skeleton.LogicalBoneNames.ToArray()) : null);
+                            .CreateSupportGeometry(skeleton.LogicalBoneNames.ToArray(), skeleton.LogicalParents,
+                                skeleton.PreciseReferencePose) : null);
                 else _feet = new(definition.FootIkInput, definition.FootIk, skeleton.LogicalBoneNames, skeleton.LogicalParents, _names,AlsFootIkPoseSpace.Fbx,
                     enableBasedFootLock ? skeleton.ReferencePose : default, captureBasedTrace);
                 _root = new(definition.RootPose, skeleton.LogicalBoneCount, _names.Length);

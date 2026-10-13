@@ -35,7 +35,9 @@ internal static class AlsAnimationRuntimeOptions
         _demoConfigured && !Has("--native-secondary-motion") ? SecondaryMotionGains.Value : null;
     // Native diagnostic entries keep their authored sampling unless explicitly overridden.
     internal static bool SampleRootMotion => _sampleRootMotion ??= (!_demoConfigured && !OS.GetCmdlineUserArgs().Any(a => a is "--enable-root-motion" or "--disable-root-motion") || RootMotionEnabled);
-    internal static bool MantleProgressControl => !SampleRootMotion && !Has("--mantle-legacy-linear");
+    internal static bool MantleProgressControl => (_demoConfigured || !SampleRootMotion) && !Has("--mantle-legacy-linear");
+    // Skeletal root sampling does not own the platform-local support hands.
+    // Ordinary Root-on Mantle must use the same contact contract and pose transaction.
     internal static bool MantleContactControl => MantleProgressControl && !Has("--mantle-no-hand-lock");
     private static readonly string[] CompleteDemoFlags =
     [

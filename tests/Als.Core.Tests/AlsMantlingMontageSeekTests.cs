@@ -48,4 +48,39 @@ public sealed class AlsMantlingMontageSeekTests
         bank.Begin(third, .1f, positionOverride: new(replay, .5f));
         Assert.Equal(.6f, bank.Candidate.ToArray().Single(i => i.InstanceId == replay).Position);
     }
+
+    [Theory]
+    [InlineData(30, 1.2f, 1.2f)]
+    [InlineData(60, 1.2f, 1.2f)]
+    [InlineData(120, 1.2f, 1.2f)]
+    [InlineData(60, .75f, 1.2f)]
+    [InlineData(60, 1.4f, .8f)]
+    public void EffectiveAssetRateDoesNotOffsetPoseFromThePhysicalOwner(int hz, float physicalRate, float assetRate)
+    {
+        var bank = new AlsMontageRuntime([], [new(3, 7, AlsMontageSlot.PostLocomotion, 1, 2, 0, 1,
+            new(AlsActionLifecycleMode.MontageAutoBlendOut, .2f, AlsActionBlendOption.HermiteCubic,
+                .3f, AlsActionBlendOption.HermiteCubic, 0), false, 4) { RateScale = assetRate }]);
+        var delta = 1f / hz;
+        var first = new AlsFrameIdentity(1, 1, 1);
+        bank.Begin(first, delta); bank.PlayAction(3, 1); bank.Commit(first);
+        var frame = new AlsMantlingFrame(true, false, false, 3, .3f, .06f, physicalRate, 150, AlsMantlingType.High);
+        for (var tick = 2; tick < hz / 2; tick++)
+        {
+            var identity = new AlsFrameIdentity(tick, 1, 1);
+            var committed = bank.Committed[0];
+            var seek = new AlsMontagePositionOverride(committed.InstanceId,
+                frame.PositionBeforeAdvance(delta, committed.EffectivePlayRate));
+            var physicalTime = frame.StartTime + (frame.Time + delta) * frame.Rate;
+            bank.Begin(identity, delta, positionOverride: seek);
+            Assert.InRange(MathF.Abs(bank.Candidate[0].Position - physicalTime), 0, 2e-7f);
+            var evaluated = bank.Frame.Evaluations.ToArray();
+            Assert.All(evaluated, value => Assert.InRange(MathF.Abs(value.Position - physicalTime), 0, 2e-7f));
+            bank.Discard();
+            Assert.Equal(committed, bank.Committed[0]);
+            bank.Begin(identity, delta, positionOverride: seek);
+            Assert.Equal(evaluated, bank.Frame.Evaluations.ToArray());
+            bank.Commit(identity);
+            frame = frame with { Time = frame.Time + delta };
+        }
+    }
 }

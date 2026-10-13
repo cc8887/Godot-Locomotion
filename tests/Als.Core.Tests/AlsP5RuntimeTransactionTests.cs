@@ -2683,6 +2683,13 @@ public sealed class AlsP5RuntimeTransactionTests
         state.JumpStartActive = 1;
         state.Initialized = 1;
         state.ViewPose = new AlsViewPoseState(25f, 26f, 27f, 0.3f, 0.4f, 28f, 29f);
+        state.ModelContactState = new()
+        {
+            Initialized = true, RawCorrection = new(1, 2, 3), RealizedCorrection = new(2, 3, 4),
+            Velocity = new(.25, .5, .75), ContactWeight = .5,
+            Releasing = true, ReleaseStartCorrection = new(3, 4, 5),
+            ReleaseVelocity = new(.5, .25, 0), ReleaseElapsedSeconds = .05f, ReleaseDurationSeconds = .2f
+        };
         state.LeftFootLock = new AlsFootLockState(
             new Vector3(30f, 31f, 32f), Quaternion.Identity,
             new Vector3(33f, 34f, 35f), Quaternion.Identity,

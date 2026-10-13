@@ -249,7 +249,9 @@ internal sealed partial class AlsBaseLayerFrameRuntime : IDisposable, IAlsGround
         {
             _movement = new(library, set, definition.Sources, definition.Binding, definition.Movement, _grounded,
                 definition.Air, definition.Landing, definition.Dependencies,
-                definition.AuthoredMontageAssets.SelectMany(a=>set.Animations[a.AnimationId].Curves).Select(c=>c.SourceName).Concat(_mantleResources?.CurveNames ?? []).ToArray(), contributor,
+                definition.AuthoredMontageAssets.SelectMany(a=>set.Animations[a.AnimationId].Curves).Select(c=>c.SourceName)
+                    .Concat(_mantleResources?.CurveNames ?? [])
+                    .Concat(_mantleResources is null ? [] : new[] { "Mask_AimOffset", "Enable_SpineRotation" }).ToArray(), contributor,
                 refactoredDefinitions, definition.GroundedEntryNotify.Binding);
             RefactoredStances?.BindOutputLayout(_movement.CurveNames);
             if (RefactoredStances is { } original)

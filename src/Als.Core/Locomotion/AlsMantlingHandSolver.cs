@@ -8,10 +8,12 @@ public sealed class AlsMantlingHandSolver
 {
     private readonly AlsComponentPose _component;
     private readonly int[][] _chains;
+    private readonly AlsTwistBoneReconstruction? _twists;
     public double MaximumResidualCm { get; private set; }
     public double MaximumRequestedCorrectionCm { get; private set; }
     public double MaximumReachExcessCm { get; private set; }
-    public AlsMantlingHandSolver(ReadOnlySpan<string> names, ReadOnlySpan<int> parents)
+    public AlsMantlingHandSolver(ReadOnlySpan<string> names, ReadOnlySpan<int> parents,
+        ReadOnlySpan<AlsPrecisePose> reference = default)
     {
         if (names.Length != parents.Length || names.IsEmpty) throw new ArgumentException("Invalid mantle arm layout.");
         var bones = names.ToArray(); _chains = new int[2][];
@@ -25,6 +27,7 @@ public sealed class AlsMantlingHandSolver
             _chains[hand] = chain;
         }
         _component = new(parents);
+        if (!reference.IsEmpty) _twists = new(names, parents, reference);
         int Find(string name) => Array.FindIndex(bones, n => n.Equals(name, StringComparison.OrdinalIgnoreCase)) is var index && index >= 0
             ? index : throw new ArgumentException("Missing mantle arm bone: " + name);
     }
@@ -39,6 +42,7 @@ public sealed class AlsMantlingHandSolver
         var world = AlsFootIkCoordinates.FbxComponentToNativeWorld(fbxComponentToWorld);
         var ledge = ledgeToWorld;
         Solve(0, left); Solve(1, right); _component.Export(output);
+        _twists?.Adjust(source, output);
         void Solve(int hand, AlsMantlingHandContact contact)
         {
             if (!float.IsFinite(contact.Weight) || contact.Weight is < 0 or > 1) throw new ArgumentException("Invalid mantle hand weight.");

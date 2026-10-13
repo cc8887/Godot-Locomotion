@@ -32,6 +32,7 @@ public partial class AnimationFailureRecoverySmoke : Node
     private AlsFrameIdentity _heldPhysicsIdentity;
     private bool[] _fixedBodies = [];
     private int _pendingActivations;
+    private Transform3D[] _heldPresentationPose = [];
 
     private void CheckBodyHistory(bool failed)
     {
@@ -222,6 +223,8 @@ public partial class AnimationFailureRecoverySmoke : Node
                 _readAnimationPose = new GodotAls.Core.Locomotion.AlsLocalPose[_heldAnimationPose.Length];
                 Require(_heldAnimationPose.Length > 0, "No committed animation pose layout.");
                 _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _heldAnimationPose);
+                var presentation = _character.PresentationSkeleton;
+                _heldPresentationPose = Enumerable.Range(0, presentation.GetBoneCount()).Select(presentation.GetBonePose).ToArray();
                 _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
                 _readAnimationPose[0] = default;
                 _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
@@ -245,6 +248,9 @@ public partial class AnimationFailureRecoverySmoke : Node
             }
             else if (_phase == 1 && _character.AnimationRecoveryAttempts > 0)
             {
+                for (var bone = 0; bone < _heldPresentationPose.Length; bone++)
+                    Require(_character.PresentationSkeleton.GetBonePose(bone) == _heldPresentationPose[bone],
+                        "Failed animation changed the committed presentation skeleton at bone " + bone);
                 _character.CopyCommittedAnimationPose(_character.Diagnostics.Identity, _readAnimationPose);
                 Require(_heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose), "Failed candidate replaced animation handoff pose.");
                 Require(ReadEntry() == _heldEntry && _heldAnimationPose.AsSpan().SequenceEqual(_readAnimationPose),
