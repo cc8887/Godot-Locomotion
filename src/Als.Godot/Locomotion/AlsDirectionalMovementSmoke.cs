@@ -154,12 +154,17 @@ public partial class AlsDirectionalMovementSmoke : Node
                 {
                     _pending=s.Mode+"-"+s.Direction+"-"+phase;
                     _requestedCaptureTick=_tick;
+                    Callable.From(DrawPendingCapture).CallDeferred();
                 }
             }
         }
         catch(Exception e){Fail(e);}
     }
     private void Save()=>File.WriteAllText(_output,JsonSerializer.Serialize(new{scenarios=_scenarios.Count,frames=_rows,captures=_captures},new JsonSerializerOptions{IncludeFields=true}));
+    private void DrawPendingCapture()
+    {
+        if(!_done&&_pending is not null)RenderingServer.ForceDraw(false);
+    }
     private void Capture()
     {
         if(_pending is null)return;

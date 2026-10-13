@@ -2,6 +2,7 @@
 
 ## 从哪里开始
 
+- [Sprint 单周期接入](verification/2026-10-13-sprint-loop-integration.md)：联合接缝／支撑修复、真实模型门禁、最新活动资产保持和普通游戏默认资源；[制作方法](../../Kimodo-Pipeline/docs/architecture/kimodo-single-loop-crop.md)。
 - [代理工作约束](../AGENTS.md)：工作目录、修改边界、架构与验证原则。
 - [Kimodo 跑步生产范围](architecture/kimodo-run-pipeline.md)：六个方向循环、严格源／目标检查、有界接触计划延长和已有交付复用；[首次生成与缺口](verification/2026-10-11-kimodo-run-generation.md)、[五方向约束修复与保留失败](verification/2026-10-11-kimodo-run-constraints.md)、[镜像与周期去重修复、重新验收和游戏测试](verification/2026-10-11-kimodo-run-mirror-revalidation.md)。
 - [启动性能埋点与命令行采集](architecture/performance-instrumentation.md)：EventSource/EventPipe、AI 可读 JSON/CSV、时间线与基线差值；[真实采集及热点](verification/2026-10-11-startup-performance-instrumentation.md)。
