@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://assets/materials/test_ground_grid.gdshader" id="1_shader"]
+
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/base_color = Color(0.19, 0.23, 0.21, 1)
+shader_parameter/minor_line_color = Color(0.31, 0.38, 0.34, 1)
+shader_parameter/major_line_color = Color(0.48, 0.59, 0.52, 1)
+shader_parameter/grid_origin = Vector2(0, 0)
+shader_parameter/minor_grid_spacing = 1.0
+shader_parameter/major_grid_spacing = 5.0
+shader_parameter/minor_line_width = 0.018
+shader_parameter/major_line_width = 0.035
+shader_parameter/grid_fade_start = 24.0
+shader_parameter/grid_fade_end = 80.0

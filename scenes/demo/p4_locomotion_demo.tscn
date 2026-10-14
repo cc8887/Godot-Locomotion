@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://bssjivbrh8v7s" path="res://src/Als.Godot/Locomotion/AlsP3CharacterSlot.cs" id="2_slot"]
 [ext_resource type="Script" uid="uid://bodxt5y15o45f" path="res://src/Als.Godot/Locomotion/AlsOrbitCamera.cs" id="3_camera"]
 [ext_resource type="Script" uid="uid://dax8durf5iq04" path="res://src/Als.Godot/Locomotion/AlsLocomotionHud.cs" id="4_hud"]
+[ext_resource type="ShaderMaterial" path="res://assets/materials/test_ground_grid.tres" id="5_ground_grid"]
 
 [sub_resource type="BoxShape3D" id="Shape_floor"]
 size = Vector3(83.17676, 0.5, 63.723648)
@@ -142,6 +143,7 @@ shape = SubResource("Shape_floor")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="World/StartFloor" unique_id=343114600]
 transform = Transform3D(50, 0, 0, 0, 1, 0, 0, 0, 50, 0, 0.25, 0)
 mesh = SubResource("PlaneMesh_wvhbo")
+surface_material_override/0 = ExtResource("5_ground_grid")
 
 [node name="ContinuousSlope" type="StaticBody3D" parent="World" unique_id=802873352]
 transform = Transform3D(1, 0, 0, 0, 0.99026805, -0.1391731, 0, 0.1391731, 0.99026805, -4, 0.061, -2.5)
