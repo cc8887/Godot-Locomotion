@@ -17,3 +17,7 @@ artifacts/*
 !artifacts/.gdignore
 benchmark-results/*
 !benchmark-results/.gdignore
+
+# Kimodo production pipeline is maintained in the standalone Kimodo-Pipeline repository.
+/tools/kimodo_pipeline/
+/tools/produce_als_resources.py

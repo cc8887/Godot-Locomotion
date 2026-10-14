@@ -2,7 +2,7 @@
 
 本设计以 2026-10-07 当前主目录的 ALS 图、原动画评价策略、采样配置及本机 Kimodo 接口为依据。目标是制作一套风格一致、能在当前 Godot ALS 组合链中工作的**新资源**，保留 ALS 的资源语义与运行机制；不是继续把同名生成动作直接覆盖到原 FBX。
 
-完整逐资产清单：[253 个动画引用身份](kimodo-als-asset-catalog.md)；完整机器可读规格：[kimodo-als-asset-contracts.json](kimodo-als-asset-contracts.json)。每项有作用、提示词草稿、生成约束、后处理、验收、原时序、精确加法参考及图引用。当前已实施[依赖图作者流程](../../tools/kimodo_pipeline/README.md)，完成部分真实候选与受控回读，尚未形成完整可运行新套件。JSON 含符号化 pose/socket 目标，不是可直接传给 `--constraints` 的文件；执行器在依赖完成后提取实际姿态并构造数值条件。
+完整逐资产清单：[253 个动画引用身份](kimodo-als-asset-catalog.md)；完整机器可读规格：[kimodo-als-asset-contracts.json](kimodo-als-asset-contracts.json)。每项有作用、提示词草稿、生成约束、后处理、验收、原时序、精确加法参考及图引用。当前已实施[依赖图作者流程](../../../Kimodo-Pipeline/README.md)，完成部分真实候选与受控回读，尚未形成完整可运行新套件。JSON 含符号化 pose/socket 目标，不是可直接传给 `--constraints` 的文件；执行器在依赖完成后提取实际姿态并构造数值条件。
 
 普通移动的数值约束、事件选周期、支撑曲线协议和 DAG 验收节点详见 [步态生成约束与分阶段验收设计](kimodo-als-locomotion-constraints-and-gates.md)。三前进试点已实现对应生成条件和门禁，实际候选尚未通过，详见 [闭环试验](../verification/2026-10-08-kimodo-gait-closure.md)。
 
@@ -224,7 +224,7 @@ fullbody/手脚约束不能提供假矩阵：必须先有可用的 SOMA 30/77 re
 
 `retarget_kimodo_resource_pack.py` 写版本化 UE 子树及逐任务 BVH/FBX/raw 回执。`publish.py` 验证原生回执和目标 physical bind、制作目标 root/IK/接触/转向/事件、同步嵌入姿态和生产输入哈希；旧 native reference 不随新包改写。保持原时长和采样接口，曲线常量继承对应状态含义。接触初值是最终目标脚部高度包络，精细接触与美术接续继续要求独立验收。
 
-版本包包含 V4、raw 与 Refactored 配置，`AlsAnimationResourcePack` 在现有 reader 上统一选择，验证文件字节后进入原角色时钟和事务。stage 不改变默认入口；实际运行检查通过后 activate 原子更新默认包指针。完整流程见 [执行脚本](../../tools/kimodo_pipeline/README.md)。
+版本包包含 V4、raw 与 Refactored 配置，`AlsAnimationResourcePack` 在现有 reader 上统一选择，验证文件字节后进入原角色时钟和事务。stage 不改变默认入口；实际运行检查通过后 activate 原子更新默认包指针。完整流程见 [执行脚本](../../../Kimodo-Pipeline/README.md)。
 
 `publish stage` 必须在最终目标 root/IK 与原时序确定后，对每个含根运动或合同声明根运动的资产烘焙独立 `motion_curves/<edition>/<OriginalAssetName>.root-motion.json`，登记包索引及文件哈希。普通 ALS 默认关闭根运动采样，离线曲线仍保留完整轨迹；开关与距离/旋转曲线语义见 [根运动策略](als-root-motion-policy.md)。这一步属于每次生产的发布流程，不依赖事后人工提取。
 

@@ -48,7 +48,7 @@
 - [交接记录](handoff/)：特定阶段或任务的交接背景，使用时核对当前代码与路线图。
 - [主目录归并审计](verification/2026-09-25-main-directory-audit.md)：旧 worktree 的移除与 ignored 资料归档位置。
 - [Kimodo 完整 ALS 资源生产设计](architecture/kimodo-als-resource-production.md)：资产作用、生成/派生原则、逐资产约束清单与验收顺序。
-- [Kimodo 依赖图执行脚本](../tools/kimodo_pipeline/README.md)：按资源先后关系生产、参考姿态传递、程序化派生与可恢复执行。
+- [Kimodo 依赖图执行脚本](../../Kimodo-Pipeline/README.md)：按资源先后关系生产、参考姿态传递、程序化派生与可恢复执行。
 - [目标竖直相位与接触 IK](architecture/kimodo-target-vertical-phase-ik.md)与[本批闭环验证](verification/2026-10-09-kimodo-target-phase-ik.md)：独立识别候选支撑，再修复接触并执行原有严格门禁，保留修复前后制品。
 - [Walk 与 Idle 手臂一致性](architecture/kimodo-idle-consistent-arms.md)与[生成对照和闭环](verification/2026-10-09-kimodo-idle-consistent-arms.md)：放松摆臂提示词、正确中性基准映射及实际 Idle 相对上身检查。
 - [v2 诊断包默认指针与普通启动验证](verification/2026-10-09-kimodo-idle-arms-default-pointer.md)：记录活动指针切换、诊断包加载开关、普通 Demo 启动证据和生产验收边界。

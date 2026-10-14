@@ -1,6 +1,0 @@
-{
-  "extends": "non_prop_rules.json",
-  "reuseModel": true,
-  "torchThreads": 2,
-  "seed": 20261010
-}
